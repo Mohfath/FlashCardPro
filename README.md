@@ -28,6 +28,18 @@ It is meant as a **starting point**: small, readable, no dependency-injection fr
   </tr>
 </table>
 
+## On your phone and in your car (Android Auto)
+
+Flashcards runs as an ordinary Android app and also as a media app on the **Android Auto** screen, so you can review hands-free while driving: the card is read aloud, the answer follows when you press play, and the steering-wheel or screen controls mark it known or not yet. The screenshots below come from Google's Android Auto Desktop Head Unit emulator.
+
+<table>
+  <tr>
+    <td align="center"><img src="screenshots/10-android-auto-decks.png" width="300" alt="Android Auto: choosing a deck"><br><sub>Pick a deck</sub></td>
+    <td align="center"><img src="screenshots/11-android-auto-prompt.png" width="300" alt="Android Auto: a card prompt"><br><sub>The card is read aloud</sub></td>
+    <td align="center"><img src="screenshots/12-android-auto-answer.png" width="300" alt="Android Auto: the revealed answer"><br><sub>Play reveals the answer</sub></td>
+  </tr>
+</table>
+
 ## Features
 
 - **Decks for any language pair.** Choose from 27 languages with flags, in alphabetical order. Each deck has its own "my language" and "language to learn".
@@ -40,7 +52,7 @@ It is meant as a **starting point**: small, readable, no dependency-injection fr
 - **Example sentences.** Optional per card, shown under the answer.
 - **Last 7 days.** Seven circles show how many cards you answered each day. Days you skipped show an ice cube.
 - **Six themes.** Daylight, Ocean, Forest, Sunset, Lavender and Midnight, chosen from a button in the top corner.
-- **Android Auto.** Review by voice and steering-wheel controls on the car screen (Media3 media session).
+- **Android Auto.** Review from the car screen with the card read aloud and steering-wheel controls (Media3 media session). Because it is not distributed through the Play Store, turn on developer mode in Android Auto to see it.
 - **Bring your own keys.** Learners enter their own API keys in Settings; they are stored only on the phone.
 
 ## Tech
