@@ -66,6 +66,7 @@ class MainActivity : ComponentActivity() {
                         onAnswer = review::answer,
                         onDelete = review::delete,
                         onToggleNative = review::toggleNative,
+                        onRedoAudio = review::redoAudio,
                     )
                     importDeckId != null -> ImportScreen(
                         ui = importer.ui.collectAsState().value,
@@ -95,6 +96,9 @@ class MainActivity : ComponentActivity() {
                         onAddCard = { addCardDeckId = it },
                         onCreate = deckList::createDeck,
                         onDeleteDeck = deckList::deleteDeck,
+                        backfill = deckList.backfill.collectAsState().value,
+                        onSetRomanize = deckList::setRomanize,
+                        onDismissBackfill = deckList::dismissBackfill,
                     )
                 }
                 Row(

@@ -66,6 +66,11 @@ class ReviewSession(
         return change
     }
 
+    /** Swaps in a newer copy of the Card being shown (for example after its audio was redone). */
+    fun refreshCurrent(updated: Card) {
+        if (current?.id == updated.id) current = updated
+    }
+
     /** First call asks for confirmation; the second call deletes. */
     fun delete(): Change? {
         val card = current ?: return null

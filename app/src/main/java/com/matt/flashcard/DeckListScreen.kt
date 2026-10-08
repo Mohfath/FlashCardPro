@@ -56,10 +56,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun DeckListScreen(decks: List<DeckSummary>?, week: List<DayCount>, selectedId: Long, onSelect: (Long) -> Unit, onOpen: (Long) -> Unit, onAddCard: (Long) -> Unit, onCreate: (String, String, String, Boolean) -> Unit, onDeleteDeck: (Deck) -> Unit) {
+fun DeckListScreen(decks: List<DeckSummary>?, week: List<DayCount>, selectedId: Long, onSelect: (Long) -> Unit, onOpen: (Long) -> Unit, onAddCard: (Long) -> Unit, onCreate: (String, String, String, Boolean) -> Unit, onDeleteDeck: (Deck) -> Unit,
+    backfill: Backfill?, onSetRomanize: (Deck, Boolean, Boolean) -> Unit, onDismissBackfill: () -> Unit,
+) {
     val c = LocalFlashColors.current
     var creating by rememberSaveable { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<DeckSummary?>(null) }
+    var askLatin by remember { mutableStateOf<DeckSummary?>(null) }
 
     Box(Modifier.fillMaxSize().background(c.canvas).safeDrawingPadding()) {
         Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
@@ -83,7 +86,10 @@ fun DeckListScreen(decks: List<DeckSummary>?, week: List<DayCount>, selectedId: 
                     DeckPicker(decks, active, onSelect)
                     Spacer(Modifier.height(16.dp))
                     Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                        DeckCard(active, onClick = { onOpen(active.deck.id) }, onAddCard = { onAddCard(active.deck.id) }, onDelete = { deleting = active })
+                        DeckCard(active, onClick = { onOpen(active.deck.id) }, onAddCard = { onAddCard(active.deck.id) }, onDelete = { deleting = active },
+                            backfill = backfill?.takeIf { it.deckId == active.deck.id }, onDismissBackfill = onDismissBackfill,
+                            onLatin = { if (active.deck.romanize) onSetRomanize(active.deck, false, false) else askLatin = active },
+                        )
                     }
                 }
             }
@@ -91,6 +97,29 @@ fun DeckListScreen(decks: List<DeckSummary>?, week: List<DayCount>, selectedId: 
             DockButton("+  New Deck", c.accent, c.onAccent, Modifier.fillMaxWidth()) { creating = true }
             Spacer(Modifier.height(16.dp))
         }
+    }
+
+    askLatin?.let { s ->
+        val missing = s.total
+        AlertDialog(
+            modifier = Modifier.padding(horizontal = 28.dp),
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+            onDismissRequest = { askLatin = null },
+            title = { Text("Store Latin letters?") },
+            text = {
+                Text(
+                    if (missing == 0) "New cards in \"${s.deck.name}\" will also get a Latin-letter reading."
+                    else "New cards will get a Latin-letter reading. Also write one for the $missing card${if (missing == 1) "" else "s"} already in this deck? That makes $missing request${if (missing == 1) "" else "s"} to your AI service.",
+                )
+            },
+            confirmButton = { TextButton(onClick = { onSetRomanize(s.deck, true, missing > 0); askLatin = null }) { Text(if (missing == 0) "Turn on" else "Turn on and fill in") } },
+            dismissButton = {
+                Row {
+                    if (missing > 0) TextButton(onClick = { onSetRomanize(s.deck, true, false); askLatin = null }) { Text("New cards only") }
+                    TextButton(onClick = { askLatin = null }) { Text("Cancel") }
+                }
+            },
+        )
     }
 
     deleting?.let { s ->
@@ -158,7 +187,10 @@ private fun EmptyState(modifier: Modifier) {
 }
 
 @Composable
-private fun DeckCard(s: DeckSummary, onClick: () -> Unit, onAddCard: () -> Unit, onDelete: () -> Unit) {
+private fun DeckCard(
+    s: DeckSummary, onClick: () -> Unit, onAddCard: () -> Unit, onDelete: () -> Unit,
+    backfill: Backfill?, onDismissBackfill: () -> Unit, onLatin: () -> Unit,
+) {
     val c = LocalFlashColors.current
     val canReview = s.total > 0
     val shape = RoundedCornerShape(24.dp)
@@ -167,7 +199,7 @@ private fun DeckCard(s: DeckSummary, onClick: () -> Unit, onAddCard: () -> Unit,
         Modifier.fillMaxWidth().clip(shape).background(c.surface).border(1.dp, c.divider, shape)
             .clickable(enabled = canReview, onClick = onClick).padding(20.dp),
     ) {
-        Pill("${languageName(s.deck.targetLanguage)} ↔ ${languageName(s.deck.sourceLanguage)}")
+        Box(Modifier.padding(end = 44.dp)) { Pill("${languageName(s.deck.targetLanguage)} ↔ ${languageName(s.deck.sourceLanguage)}") }
         Spacer(Modifier.height(12.dp))
         Text(s.deck.name, style = FlashType.headlineMd, color = c.ink)
         Text("${s.total} Card${if (s.total == 1) "" else "s"} total", style = FlashType.bodyMd, color = c.inkSecondary)
@@ -194,6 +226,24 @@ private fun DeckCard(s: DeckSummary, onClick: () -> Unit, onAddCard: () -> Unit,
             "+  Add Card", style = FlashType.labelLg, color = c.accent,
             modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onAddCard).padding(vertical = 10.dp, horizontal = 4.dp),
         )
+        if (languageFor(s.deck.targetLanguage)?.latin == false) {
+            Text(
+                if (s.deck.romanize) "Latin letters: on · turn off" else "Latin letters: off · turn on",
+                style = FlashType.labelLg, color = c.inkSecondary,
+                modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onLatin).padding(vertical = 10.dp, horizontal = 4.dp),
+            )
+        }
+        if (backfill != null) {
+            Text(
+                when {
+                    backfill.error != null -> "Stopped at ${backfill.done} of ${backfill.total}: ${backfill.error}"
+                    backfill.finished -> "Latin letters added to ${backfill.done} card${if (backfill.done == 1) "" else "s"}."
+                    else -> "Writing Latin letters… ${backfill.done} of ${backfill.total}"
+                },
+                style = FlashType.labelMd, color = if (backfill.error != null) c.danger else c.accent,
+                modifier = Modifier.clickable(enabled = backfill.finished, onClick = onDismissBackfill).padding(horizontal = 4.dp),
+            )
+        }
     }
     TrashIcon(
         c.inkSecondary,
@@ -238,9 +288,16 @@ private fun BoxBar(counts: List<Int>) {
     val c = LocalFlashColors.current
     val total = counts.sum()
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.inset).padding(12.dp)) {
-        Row {
-            Text("Boxes 1–5", style = FlashType.labelMd, color = c.inkSecondary, modifier = Modifier.weight(1f))
-            Text("Box 1: ${counts.first()} · Box 5: ${counts.last()}", style = FlashType.labelMd, color = c.inkSecondary)
+        val counted = "Box 1: ${counts.first()} · Box 5: ${counts.last()}"
+        if (LocalDensity.current.fontScale > 1.3f) {
+            // Big system fonts: stack the two lines instead of letting them squeeze each other.
+            Text("Boxes 1–5", style = FlashType.labelMd, color = c.inkSecondary)
+            Text(counted, style = FlashType.labelMd, color = c.inkSecondary)
+        } else {
+            Row {
+                Text("Boxes 1–5", style = FlashType.labelMd, color = c.inkSecondary, modifier = Modifier.weight(1f))
+                Text(counted, style = FlashType.labelMd, color = c.inkSecondary, maxLines = 1, softWrap = false)
+            }
         }
         Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth().height(8.dp).clip(CircleShape).background(c.divider)) {

@@ -19,6 +19,8 @@ interface FlashcardDao {
     @Insert suspend fun insertDeck(deck: Deck): Long
     @Insert suspend fun insertCard(card: Card): Long
     @Update suspend fun updateCard(card: Card)
+    @Update suspend fun updateDeck(deck: Deck)
+    @Query("UPDATE card SET romanization = :reading WHERE id = :id") suspend fun setRomanization(id: Long, reading: String)
     @Delete suspend fun deleteCard(card: Card)
     @Delete suspend fun deleteDeck(deck: Deck)
     @Query("SELECT * FROM deck ORDER BY name") fun decks(): Flow<List<Deck>>

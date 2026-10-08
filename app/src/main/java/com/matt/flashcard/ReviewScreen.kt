@@ -65,7 +65,7 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 
 @Composable
-fun ReviewScreen(ui: ReviewUi?, onBack: () -> Unit, onPlay: (String) -> Unit, onReveal: () -> Unit, onAnswer: (Verdict) -> Unit, onDelete: () -> Unit, onToggleNative: () -> Unit = {}) {
+fun ReviewScreen(ui: ReviewUi?, onBack: () -> Unit, onPlay: (String) -> Unit, onReveal: () -> Unit, onAnswer: (Verdict) -> Unit, onDelete: () -> Unit, onToggleNative: () -> Unit = {}, onRedoAudio: () -> Unit = {}) {
     val c = LocalFlashColors.current
     Box(Modifier.fillMaxSize().background(c.canvas).safeDrawingPadding()) {
         when {
@@ -103,7 +103,7 @@ fun ReviewScreen(ui: ReviewUi?, onBack: () -> Unit, onPlay: (String) -> Unit, on
                         },
                     )
                     Spacer(Modifier.height(16.dp))
-                    Dock(ui, onReveal, answerAnimated, onDelete)
+                    Dock(ui, onReveal, answerAnimated, onDelete, onRedoAudio)
                     Spacer(Modifier.height(16.dp))
                 }
             }
@@ -333,7 +333,7 @@ private fun CardText(
 }
 
 @Composable
-private fun Dock(ui: ReviewUi, onReveal: () -> Unit, onAnswer: (Verdict) -> Unit, onDelete: () -> Unit) {
+private fun Dock(ui: ReviewUi, onReveal: () -> Unit, onAnswer: (Verdict) -> Unit, onDelete: () -> Unit, onRedoAudio: () -> Unit) {
     val c = LocalFlashColors.current
     if (!ui.revealed) {
         DockButton("Reveal", c.accent, c.onAccent, Modifier.fillMaxWidth(), onReveal)
@@ -343,12 +343,24 @@ private fun Dock(ui: ReviewUi, onReveal: () -> Unit, onAnswer: (Verdict) -> Unit
             DockButton("Know", c.accent, c.onAccent, Modifier.weight(1f)) { onAnswer(Verdict.KNOW) }
         }
     }
+    if (ui.audioError != null) {
+        Spacer(Modifier.height(6.dp))
+        Text(ui.audioError, style = FlashType.labelMd, color = c.danger, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+    }
     Spacer(Modifier.height(8.dp))
-    Text(
-        if (ui.pendingDelete) "Press again to delete" else "Delete",
-        style = FlashType.labelLg, color = c.danger, textAlign = TextAlign.Center,
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onDelete).padding(vertical = 12.dp),
-    )
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+        Text(
+            if (ui.redoingAudio) "Making audio…" else "Redo audio",
+            style = FlashType.labelLg, color = c.inkSecondary, textAlign = TextAlign.Center,
+            modifier = Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).clickable(enabled = !ui.redoingAudio, onClick = onRedoAudio)
+                .padding(vertical = 12.dp),
+        )
+        Text(
+            if (ui.pendingDelete) "Press again to delete" else "Delete",
+            style = FlashType.labelLg, color = c.danger, textAlign = TextAlign.Center,
+            modifier = Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).clickable(onClick = onDelete).padding(vertical = 12.dp),
+        )
+    }
 }
 
 @Composable
