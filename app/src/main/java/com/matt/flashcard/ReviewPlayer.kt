@@ -18,11 +18,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Presents a review session to Android Auto as a media player, so the car's own media controls drive it:
- * previous = Didn't know, play/pause = Reveal, next = Know. Delete is a custom action (see [requestDelete]).
- *
- * The playlist is [placeholder, current Card, placeholder]: the two placeholders only keep the car's
- * previous and next buttons enabled. Whatever the car seeks to, the current Card stays at index 1.
+ * Presents a review session to Android Auto as a media player: play/pause = Reveal, and the two buttons the
+ * service adds (check = Know, cross = Again) call [answer]. The steering-wheel next and previous keys map to the
+ * same two answers. Deleting a Card is left to the phone, since nobody should do that while driving.
  */
 class ReviewPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) {
     private val appContext = context.applicationContext
@@ -40,8 +38,6 @@ class ReviewPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) 
     /** Choosing a Deck in the car sends "play" right after; that one must not count as Reveal. */
     private var ignorePlayUntil = 0L
 
-    val pendingDelete get() = ui?.pendingDelete == true
-
     fun openDeck(deckId: Long) {
         scope.launch {
             val (d, cards) = withContext(Dispatchers.IO) { dao.deck(deckId) to dao.cardsIn(deckId) }
@@ -53,11 +49,12 @@ class ReviewPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) 
         }
     }
 
-    fun requestDelete() {
+    /** Know or Again for the Card on the car screen. */
+    fun answer(verdict: Verdict) {
         val s = session ?: return
+        if (s.current == null) return
         val before = ui
-        val change = s.delete()
-        persist(change)
+        persist(s.answer(verdict))
         refresh(before)
     }
 
@@ -74,13 +71,12 @@ class ReviewPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) 
                 .build()
         }
         val finished = current.cardId == null
-        val playlist = if (finished) listOf(item("done", finishedMetadata()))
-        else listOf(item("before", MediaMetadata.EMPTY), item("card:${current.cardId}", cardMetadata(current)), item("after", MediaMetadata.EMPTY))
+        val playlist = listOf(if (finished) item("done", finishedMetadata()) else item("card:${current.cardId}", cardMetadata(current)))
         return builder
             .setAvailableCommands(if (finished) COMMANDS_IDLE else COMMANDS_REVIEWING)
             .setPlaybackState(STATE_READY)
             .setPlaylist(playlist)
-            .setCurrentMediaItemIndex(if (finished) 0 else 1)
+            .setCurrentMediaItemIndex(0)
             .build()
     }
 
@@ -92,21 +88,6 @@ class ReviewPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) 
                 s.reveal()
                 refresh(before)
             }
-        }
-        return Futures.immediateVoidFuture()
-    }
-
-    override fun handleSeek(mediaItemIndex: Int, positionMs: Long, seekCommand: Int): ListenableFuture<*> {
-        val verdict = when (seekCommand) {
-            COMMAND_SEEK_TO_NEXT, COMMAND_SEEK_TO_NEXT_MEDIA_ITEM -> Verdict.KNOW
-            COMMAND_SEEK_TO_PREVIOUS, COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> Verdict.DIDNT_KNOW
-            else -> null
-        }
-        val s = session
-        if (verdict != null && s != null) {
-            val before = ui
-            persist(s.answer(verdict))
-            refresh(before)
         }
         return Futures.immediateVoidFuture()
     }
@@ -170,7 +151,6 @@ class ReviewPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) 
 
     private fun cardMetadata(ui: ReviewUi): MediaMetadata {
         val subtitle = when {
-            ui.pendingDelete -> "Press Delete again to remove this Card"
             ui.revealed -> ui.answerText
             else -> "Press play to reveal"
         }
@@ -197,8 +177,6 @@ class ReviewPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) 
 
         val COMMANDS_REVIEWING: Player.Commands = Player.Commands.Builder().addAll(
             COMMAND_PLAY_PAUSE, COMMAND_PREPARE, COMMAND_STOP,
-            COMMAND_SEEK_TO_NEXT, COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
-            COMMAND_SEEK_TO_PREVIOUS, COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
             COMMAND_GET_CURRENT_MEDIA_ITEM, COMMAND_GET_TIMELINE, COMMAND_GET_METADATA,
             COMMAND_SET_MEDIA_ITEM, COMMAND_CHANGE_MEDIA_ITEMS,
         ).build()

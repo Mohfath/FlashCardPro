@@ -30,6 +30,9 @@ data class ReviewUi(
     val hideNative: Boolean = false,
     val redoingAudio: Boolean = false,
     val audioError: String? = null,
+    /** Flag emoji of the Prompt / Answer language, for the car screen. */
+    val promptFlag: String = "",
+    val answerFlag: String = "",
 )
 
 class ReviewViewModel(app: Application) : AndroidViewModel(app) {
@@ -155,6 +158,8 @@ internal fun buildReviewUi(d: Deck, s: ReviewSession, hideNative: Boolean = fals
         promptRomanization = if (srcToTarget) null else card.romanization,
         answerRomanization = if (srcToTarget) card.romanization else null,
         hideNative = hideNative,
+        promptFlag = languageFor(if (srcToTarget) d.sourceLanguage else d.targetLanguage)?.flag.orEmpty(),
+        answerFlag = languageFor(if (srcToTarget) d.targetLanguage else d.sourceLanguage)?.flag.orEmpty(),
     )
 }
 

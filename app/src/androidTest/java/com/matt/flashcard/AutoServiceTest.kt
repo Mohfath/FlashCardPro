@@ -23,6 +23,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /** Acts like Android Auto: a media browser/controller talking to [FlashcardService] on the device. */
+private val KNOW = SessionCommand("com.matt.flashcard.KNOW", android.os.Bundle.EMPTY)
+private val AGAIN = SessionCommand("com.matt.flashcard.AGAIN", android.os.Bundle.EMPTY)
+
 @RunWith(AndroidJUnit4::class)
 class AutoServiceTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
@@ -88,8 +91,8 @@ class AutoServiceTest {
         assertTrue("artwork should be a real image", meta.artworkData!!.size > 2_000)
         onMain {
             assertTrue(browser.isCommandAvailable(Player.COMMAND_PLAY_PAUSE))
-            assertTrue(browser.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT))
-            assertTrue(browser.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS))
+            assertFalse("skip buttons are replaced by Know and Again", browser.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT))
+            assertEquals(listOf("Again", "Know"), browser.customLayout.map { it.displayName.toString() })
         }
     }
 
@@ -106,42 +109,40 @@ class AutoServiceTest {
         assertFalse("play must not stay in the playing state", onMain { browser.playWhenReady })
     }
 
-    @Test fun nextMeansKnowAndPreviousMeansDidntKnow() {
+    @Test fun knowAndAgainButtonsAnswerTheCard() {
         startReview()
         Thread.sleep(2_500)
         onMain { browser.play() }
         waitUntil("Reveal") { subtitle() != "Press play to reveal" }
         val first = onMain { title() }
-        onMain { browser.seekToNext() }
+        onMain { browser.sendCustomCommand(KNOW, android.os.Bundle.EMPTY) }
         waitUntil("next Card") { title() != first && subtitle() == "Press play to reveal" }
         waitUntil("Know saved", 5_000) { cards().count { it.box == 2 } == 1 }
 
         onMain { browser.play() }
         waitUntil("Reveal 2") { subtitle() != "Press play to reveal" }
         val second = onMain { title() }
-        onMain { browser.seekToPrevious() }
+        onMain { browser.sendCustomCommand(AGAIN, android.os.Bundle.EMPTY) }
         waitUntil("third Card") { title() != second && subtitle() == "Press play to reveal" }
         waitUntil("Didn't know saved", 5_000) { cards().count { it.lastReviewedAt != null } == 2 }
         assertEquals(1, cards().count { it.box == 2 })
         assertEquals(1, cards().count { it.box == 1 && it.lastReviewedAt != null })
     }
 
-    @Test fun nextBeforeRevealDoesNothing() {
+    @Test fun knowBeforeRevealDoesNothing() {
         startReview()
         val first = onMain { title() }
-        onMain { browser.seekToNext() }
+        onMain { browser.sendCustomCommand(KNOW, android.os.Bundle.EMPTY) }
         Thread.sleep(800)
         assertEquals(first, onMain { title() })
         assertEquals(0, cards().count { it.lastReviewedAt != null })
     }
 
-    @Test fun deleteNeedsASecondPress() {
+    @Test fun theCarOffersNoDeleteButton() {
         startReview()
-        val delete = SessionCommand("com.matt.flashcard.DELETE", android.os.Bundle.EMPTY)
-        onMain { browser.sendCustomCommand(delete, android.os.Bundle.EMPTY) }
-        waitUntil("confirmation prompt") { subtitle().startsWith("Press Delete again") }
+        onMain {
+            assertTrue(browser.customLayout.none { it.displayName.toString().contains("elete") })
+        }
         assertEquals(3, cards().size)
-        onMain { browser.sendCustomCommand(delete, android.os.Bundle.EMPTY) }
-        waitUntil("Card deleted", 5_000) { cards().size == 2 }
     }
 }

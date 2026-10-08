@@ -30,13 +30,13 @@ It is meant as a **starting point**: small, readable, no dependency-injection fr
 
 ## On your phone and in your car (Android Auto)
 
-Flashcards runs as an ordinary Android app and also as a media app on the **Android Auto** screen, so you can review hands-free while driving: the card is read aloud, the answer follows when you press play, and the steering-wheel or screen controls mark it known or not yet. The screenshots below come from Google's Android Auto Desktop Head Unit emulator.
+Flashcards runs as an ordinary Android app and also as a media app on the **Android Auto** screen, so you can review hands-free while driving: the card is read aloud, play reveals the answer, and the ✓ and ✗ buttons (or the steering-wheel next and previous keys) mark it known or not yet. The card art is coloured by Leitner box, from red in Box 1 to green in Box 5, with the language flag, cards left and a five-step box bar. The screenshots below come from Google's Android Auto Desktop Head Unit emulator.
 
 <table>
   <tr>
     <td align="center"><img src="screenshots/10-android-auto-decks.png" width="300" alt="Android Auto: choosing a deck"><br><sub>Pick a deck</sub></td>
-    <td align="center"><img src="screenshots/11-android-auto-prompt.png" width="300" alt="Android Auto: a card prompt"><br><sub>The card is read aloud</sub></td>
-    <td align="center"><img src="screenshots/12-android-auto-answer.png" width="300" alt="Android Auto: the revealed answer"><br><sub>Play reveals the answer</sub></td>
+    <td align="center"><img src="screenshots/11-android-auto-prompt.png" width="300" alt="Android Auto: a card prompt"><br><sub>Colour follows the Leitner box</sub></td>
+    <td align="center"><img src="screenshots/12-android-auto-answer.png" width="300" alt="Android Auto: the revealed answer"><br><sub>Play reveals it; ✓ know, ✗ again</sub></td>
   </tr>
 </table>
 
