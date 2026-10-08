@@ -39,3 +39,22 @@ class PracticeAndAiTest {
         parseOpenAiText("""{"choices":[{"message":{"content":""}}]}""")
     }
 }
+
+class CleanReadingTest {
+    @Test fun shortSingleLineAnswerIsKept() {
+        assertEquals("salâm", cleanReading("سلام", " salâm "))
+    }
+
+    @Test fun chattyAnswerFallsBackToTheOriginalText() {
+        val chat = "I appreciate your message, but it appears to be in English, not Persian.\n\nIf you meant to send Persian text..."
+        assertEquals("I love this city", cleanReading("I love this city", chat))
+    }
+
+    @Test fun veryLongSingleLineFallsBack() {
+        assertEquals("hi", cleanReading("hi", "x".repeat(200)))
+    }
+
+    @Test fun emptyAnswerFallsBack() {
+        assertEquals("hi", cleanReading("hi", "   "))
+    }
+}

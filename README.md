@@ -6,6 +6,26 @@ Type or paste a phrase and the app translates it, speaks it aloud and, for scrip
 
 It is meant as a **starting point**: small, readable, no dependency-injection framework, and every outside service sits behind a small client class you can swap for your own.
 
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center"><img src="screenshots/01-decks.png" width="220" alt="Deck screen with the last 7 days"><br><sub>Decks and your last 7 days</sub></td>
+    <td align="center"><img src="screenshots/06-review.png" width="220" alt="A revealed card with Persian script and Latin letters"><br><sub>Review: script plus Latin letters</sub></td>
+    <td align="center"><img src="screenshots/07-swipe-know.png" width="220" alt="Dragging a card right, tinted green"><br><sub>Swipe right: know it</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="screenshots/04-add-card.png" width="220" alt="Add Card with translation and Latin letters filled in"><br><sub>Type once, the rest fills in</sub></td>
+    <td align="center"><img src="screenshots/05-import.png" width="220" alt="Importing a pasted list with a live counter"><br><sub>Paste a list, watch the counter</sub></td>
+    <td align="center"><img src="screenshots/08-swipe-dont-know.png" width="220" alt="Dragging a card left, tinted pink"><br><sub>Swipe left: not yet</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="screenshots/03-new-deck.png" width="220" alt="New Deck dialog with language pickers and the Latin letters switch"><br><sub>New deck, 27 languages</sub></td>
+    <td align="center"><img src="screenshots/09-settings.png" width="220" alt="Settings screen for API keys"><br><sub>Bring your own API keys</sub></td>
+    <td align="center"><img src="screenshots/02-decks-midnight.png" width="220" alt="Deck screen in the Midnight theme"><br><sub>Six themes (Midnight shown)</sub></td>
+  </tr>
+</table>
+
 ## Features
 
 - **Decks for any language pair.** Choose from 27 languages with flags, in alphabetical order. Each deck has its own "my language" and "language to learn".

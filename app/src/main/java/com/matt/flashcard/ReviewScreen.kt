@@ -61,6 +61,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 
@@ -231,7 +232,7 @@ private fun CompactHeader(ui: ReviewUi, onBack: () -> Unit, onToggleNative: () -
             modifier = Modifier.clip(CircleShape).clickable(onClick = onBack).padding(8.dp).size(24.dp),
         )
         Spacer(Modifier.width(8.dp))
-        Text(ui.deckName, style = FlashType.labelLg, color = c.ink, maxLines = 1, modifier = Modifier.weight(1f))
+        Text(ui.deckName, style = FlashType.labelLg, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         if (ui.promptRomanization != null || ui.answerRomanization != null) {
             Text(
                 if (ui.hideNative) "Aa  Latin only" else "Aa  + script", style = FlashType.labelMd, color = c.accent,

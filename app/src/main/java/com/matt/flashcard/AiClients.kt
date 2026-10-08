@@ -13,8 +13,19 @@ internal fun romanizationSystemPrompt(languageName: String) =
     "The user is learning $languageName but cannot read its script. Rewrite the text they send in the Latin alphabet, " +
         "as a pronunciation guide a learner can read aloud: use the standard romanization for the language " +
         "(Hepburn for Japanese, Pinyin with tone marks for Chinese, Revised Romanization for Korean) and include the short " +
-        "vowels that Arabic and Persian script leaves out. Keep punctuation. Reply with the Latin-letter text only, " +
-        "with no quotes, notes or translation."
+        "vowels that Arabic and Persian script leaves out. Keep punctuation. If the text is already in Latin letters or is not " +
+        "$languageName, repeat it unchanged. Reply with the Latin-letter text only, on one line, and never add quotes, notes, " +
+        "explanations or a translation."
+
+/**
+ * Models sometimes answer with a chat reply instead of the reading (for example when the text is not in the language).
+ * Anything that is not a short single line is not a reading, so the original text is kept instead.
+ */
+internal fun cleanReading(input: String, answer: String): String {
+    val text = answer.trim()
+    val tooLong = text.length > input.length * 4 + 40
+    return if (text.isEmpty() || tooLong || '\n' in text) input.trim() else text
+}
 
 /** One JSON POST to an AI service; each provider supplies its own url, headers, body and way of reading the answer. */
 private suspend fun postForText(
@@ -123,6 +134,10 @@ class Romanizer(private val settings: AppSettings) {
         val provider = settings.provider()
         val key = settings.aiKey(provider)
         if (key.isBlank()) throw RomanizationException("No ${provider.label} key: add it in Settings")
+        return cleanReading(text, askModel(provider, key, text, languageName))
+    }
+
+    private suspend fun askModel(provider: AiProvider, key: String, text: String, languageName: String): String {
         return when (provider) {
             AiProvider.ANTHROPIC -> postForText(
                 "Claude", "https://api.anthropic.com/v1/messages",
