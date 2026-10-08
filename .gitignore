@@ -1,0 +1,13 @@
+.gradle/
+build/
+local.properties
+.env
+*.iml
+.idea/
+.kotlin/
+
+# Private working notes: kept on this computer, not published
+HANDOFF.md
+CONTEXT.md
+docs/
+add-card-screenshot.png
