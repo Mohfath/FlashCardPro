@@ -6,6 +6,8 @@ Type or paste a phrase and the app translates it, speaks it aloud and, for scrip
 
 It is meant as a **starting point**: small, readable, no dependency-injection framework, and every outside service sits behind a small client class you can swap for your own.
 
+**Try it:** download the APK from the [latest release](https://github.com/Mohfath/FlashCardPro/releases/latest), install it, and add your own keys in Settings. It is a preview build, signed with the standard Android debug key.
+
 ## Screenshots
 
 <table>
@@ -133,7 +135,7 @@ Built with Jetpack Compose, Room, Media3 and Kotlin (all Apache 2.0), the **Plus
 
 ## Contributing
 
-Issues and pull requests are welcome. Please keep changes small and add a unit test for new rules or parsing.
+Issues, discussions and pull requests are welcome. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for how to run the tests and what to check first. Please keep changes small and add a unit test for new rules or parsing.
 
 ## License
 
