@@ -40,6 +40,10 @@ Flashcards runs as an ordinary Android app and also as a media app on the **Andr
   </tr>
 </table>
 
+The card art changes colour with the Leitner box (shown here for Box 1 to 5, plus a Persian card with its Latin-letter reading):
+
+<p align="center"><img src="screenshots/13-android-auto-boxes.png" width="640" alt="Car card artwork for Box 1 to Box 5 and a Persian card"></p>
+
 ## Features
 
 - **Decks for any language pair.** Choose from 27 languages with flags, in alphabetical order. Each deck has its own "my language" and "language to learn".
