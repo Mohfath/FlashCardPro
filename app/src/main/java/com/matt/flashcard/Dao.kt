@@ -26,6 +26,7 @@ interface FlashcardDao {
     @Query("SELECT * FROM deck ORDER BY name") fun decks(): Flow<List<Deck>>
     @Query("SELECT * FROM deck ORDER BY id LIMIT 1") suspend fun firstDeck(): Deck?
     @Query("SELECT * FROM deck WHERE id = :id") suspend fun deck(id: Long): Deck?
+    @Query("SELECT * FROM deck WHERE name = :name LIMIT 1") suspend fun deckNamed(name: String): Deck?
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertPracticeDay(day: PracticeDay): Long
     @Query("UPDATE practice_day SET count = count + 1 WHERE day = :day") suspend fun bumpPracticeDay(day: Long)
     @Query("SELECT * FROM practice_day WHERE day >= :from") fun practiceSince(from: Long): Flow<List<PracticeDay>>
@@ -52,7 +53,15 @@ private val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
-@Database(entities = [Deck::class, Card::class, PracticeDay::class], version = 4, exportSchema = false)
+private val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE deck ADD COLUMN latinOnly INTEGER NOT NULL DEFAULT 0")
+        // The starter Persian deck was seeded showing both; it is meant to show Latin letters only.
+        db.execSQL("UPDATE deck SET latinOnly = 1 WHERE name = 'Persian Basics' AND romanize = 1")
+    }
+}
+
+@Database(entities = [Deck::class, Card::class, PracticeDay::class], version = 5, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): FlashcardDao
 
@@ -61,7 +70,7 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun get(context: Context): AppDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "flashcards.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build().also { instance = it }
         }
     }

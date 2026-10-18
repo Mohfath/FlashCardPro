@@ -63,10 +63,11 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlin.math.abs
 
 @Composable
-fun ReviewScreen(ui: ReviewUi?, onBack: () -> Unit, onPlay: (String) -> Unit, onReveal: () -> Unit, onAnswer: (Verdict) -> Unit, onDelete: () -> Unit, onToggleNative: () -> Unit = {}, onRedoAudio: () -> Unit = {}) {
+fun ReviewScreen(ui: ReviewUi?, onBack: () -> Unit, onPlay: (String) -> Unit, onReveal: () -> Unit, onAnswer: (Verdict) -> Unit, onDelete: () -> Unit, onRedoAudio: () -> Unit = {}) {
     val c = LocalFlashColors.current
     Box(Modifier.fillMaxSize().background(c.canvas).safeDrawingPadding()) {
         when {
@@ -90,7 +91,7 @@ fun ReviewScreen(ui: ReviewUi?, onBack: () -> Unit, onPlay: (String) -> Unit, on
                     // The target-language side speaks as soon as it appears.
                     LaunchedEffect(ui.cardId, ui.promptAudio) { ui.promptAudio?.let(onPlay) }
                     LaunchedEffect(ui.cardId, ui.revealed) { if (ui.revealed) ui.answerAudio?.let(onPlay) }
-                    CompactHeader(ui, onBack, onToggleNative)
+                    CompactHeader(ui, onBack)
                     Spacer(Modifier.height(8.dp))
                     CardFace(
                         ui, onPlay, onReveal, scroll, swipe,
@@ -224,7 +225,7 @@ private fun Modifier.swipeGestures(
 }
 
 @Composable
-private fun CompactHeader(ui: ReviewUi, onBack: () -> Unit, onToggleNative: () -> Unit) {
+private fun CompactHeader(ui: ReviewUi, onBack: () -> Unit) {
     val c = LocalFlashColors.current
     Row(Modifier.fillMaxWidth().height(44.dp).padding(end = 48.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(
@@ -233,14 +234,6 @@ private fun CompactHeader(ui: ReviewUi, onBack: () -> Unit, onToggleNative: () -
         )
         Spacer(Modifier.width(8.dp))
         Text(ui.deckName, style = FlashType.labelLg, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-        if (ui.promptRomanization != null || ui.answerRomanization != null) {
-            Text(
-                if (ui.hideNative) "Aa  Latin only" else "Aa  + script", style = FlashType.labelMd, color = c.accent,
-                modifier = Modifier.clip(CircleShape).background(c.accent.copy(alpha = 0.1f)).clickable(onClick = onToggleNative)
-                    .padding(horizontal = 10.dp, vertical = 5.dp),
-            )
-            Spacer(Modifier.width(10.dp))
-        }
         Text("${ui.dueRemaining} due", style = FlashType.labelMd, color = c.accent)
     }
 }
@@ -301,6 +294,19 @@ private fun SideLabel(label: String) {
     Text(label, style = FlashType.labelMd, color = c.inkSecondary)
 }
 
+/** Font size for Card text: big for single words, shrinking so long sentences still fit the card. */
+internal fun cardFontSize(length: Int): Int = when {
+    length <= 12 -> 48
+    length <= 30 -> 40
+    length <= 60 -> 32
+    else -> 26
+}
+
+private fun cardTextStyle(text: String): androidx.compose.ui.text.TextStyle {
+    val size = cardFontSize(text.length)
+    return FlashType.bodyXl.copy(fontSize = size.sp, lineHeight = (size * 1.25f).sp)
+}
+
 /** The Card text, with a speaker beside it to replay the audio when this side is the language being learned. */
 @Composable
 private fun CardText(
@@ -315,9 +321,9 @@ private fun CardText(
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
         Column(Modifier.weight(1f, fill = false), horizontalAlignment = Alignment.CenterHorizontally) {
             if (romanization != null && hideNative) {
-                Text(romanization, style = FlashType.bodyXl, color = color, textAlign = TextAlign.Center)
+                Text(romanization, style = cardTextStyle(romanization), color = color, textAlign = TextAlign.Center)
             } else {
-                Text(text, style = FlashType.bodyXl, color = color, textAlign = TextAlign.Center)
+                Text(text, style = cardTextStyle(text), color = color, textAlign = TextAlign.Center)
                 if (romanization != null) {
                     Spacer(Modifier.height(4.dp))
                     Text(romanization, style = FlashType.bodyMd, color = c.inkSecondary, textAlign = TextAlign.Center)

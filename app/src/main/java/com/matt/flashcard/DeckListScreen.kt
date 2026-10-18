@@ -29,7 +29,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -56,13 +56,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun DeckListScreen(decks: List<DeckSummary>?, week: List<DayCount>, selectedId: Long, onSelect: (Long) -> Unit, onOpen: (Long) -> Unit, onAddCard: (Long) -> Unit, onCreate: (String, String, String, Boolean) -> Unit, onDeleteDeck: (Deck) -> Unit,
-    backfill: Backfill?, onSetRomanize: (Deck, Boolean, Boolean) -> Unit, onDismissBackfill: () -> Unit,
+fun DeckListScreen(decks: List<DeckSummary>?, week: List<DayCount>, selectedId: Long, onSelect: (Long) -> Unit, onOpen: (Long) -> Unit, onAddCard: (Long) -> Unit, onCreate: (String, String, String, ReadingMode) -> Unit, onDeleteDeck: (Deck) -> Unit,
+    backfill: Backfill?, onSetReading: (Deck, ReadingMode, Boolean) -> Unit, onDismissBackfill: () -> Unit,
 ) {
     val c = LocalFlashColors.current
     var creating by rememberSaveable { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<DeckSummary?>(null) }
-    var askLatin by remember { mutableStateOf<DeckSummary?>(null) }
+    var choosingReading by remember { mutableStateOf<DeckSummary?>(null) }
 
     Box(Modifier.fillMaxSize().background(c.canvas).safeDrawingPadding()) {
         Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
@@ -88,7 +88,7 @@ fun DeckListScreen(decks: List<DeckSummary>?, week: List<DayCount>, selectedId: 
                     Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                         DeckCard(active, onClick = { onOpen(active.deck.id) }, onAddCard = { onAddCard(active.deck.id) }, onDelete = { deleting = active },
                             backfill = backfill?.takeIf { it.deckId == active.deck.id }, onDismissBackfill = onDismissBackfill,
-                            onLatin = { if (active.deck.romanize) onSetRomanize(active.deck, false, false) else askLatin = active },
+                            onLatin = { choosingReading = active },
                         )
                     }
                 }
@@ -99,24 +99,42 @@ fun DeckListScreen(decks: List<DeckSummary>?, week: List<DayCount>, selectedId: 
         }
     }
 
-    askLatin?.let { s ->
-        val missing = s.total
+    choosingReading?.let { s ->
+        var mode by remember(s.deck.id) { mutableStateOf(s.deck.readingMode) }
+        // Cards written before Latin letters were on have no reading yet; offer to write them.
+        val missing = if (mode != ReadingMode.SCRIPT && !s.deck.romanize) s.total else 0
         AlertDialog(
             modifier = Modifier.padding(horizontal = 28.dp),
             properties = DialogProperties(usePlatformDefaultWidth = false),
-            onDismissRequest = { askLatin = null },
-            title = { Text("Store Latin letters?") },
+            onDismissRequest = { choosingReading = null },
+            title = { Text("How to show cards") },
             text = {
-                Text(
-                    if (missing == 0) "New cards in \"${s.deck.name}\" will also get a Latin-letter reading."
-                    else "New cards will get a Latin-letter reading. Also write one for the $missing card${if (missing == 1) "" else "s"} already in this deck? That makes $missing request${if (missing == 1) "" else "s"} to your AI service.",
-                )
+                Column {
+                    ReadingMode.entries.forEach { option ->
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { mode = option }.padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = mode == option, onClick = { mode = option })
+                            Text(option.label, style = FlashType.bodyMd, color = c.ink)
+                        }
+                    }
+                    if (missing > 0) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Also write Latin letters for the $missing card${if (missing == 1) "" else "s"} already in this deck? That makes $missing request${if (missing == 1) "" else "s"} to your AI service.",
+                            style = FlashType.labelMd, color = c.inkSecondary,
+                        )
+                    }
+                }
             },
-            confirmButton = { TextButton(onClick = { onSetRomanize(s.deck, true, missing > 0); askLatin = null }) { Text(if (missing == 0) "Turn on" else "Turn on and fill in") } },
+            confirmButton = {
+                TextButton(onClick = { onSetReading(s.deck, mode, missing > 0); choosingReading = null }) { Text(if (missing > 0) "Apply and fill in" else "Apply") }
+            },
             dismissButton = {
                 Row {
-                    if (missing > 0) TextButton(onClick = { onSetRomanize(s.deck, true, false); askLatin = null }) { Text("New cards only") }
-                    TextButton(onClick = { askLatin = null }) { Text("Cancel") }
+                    if (missing > 0) TextButton(onClick = { onSetReading(s.deck, mode, false); choosingReading = null }) { Text("New cards only") }
+                    TextButton(onClick = { choosingReading = null }) { Text("Cancel") }
                 }
             },
         )
@@ -138,7 +156,7 @@ fun DeckListScreen(decks: List<DeckSummary>?, week: List<DayCount>, selectedId: 
         )
     }
 
-    if (creating) NewDeckDialog(onDismiss = { creating = false }, onCreate = { n, s, t, r -> onCreate(n, s, t, r); creating = false })
+    if (creating) NewDeckDialog(onDismiss = { creating = false }, onCreate = { n, s, t, m -> onCreate(n, s, t, m); creating = false })
 }
 
 @Composable
@@ -228,7 +246,7 @@ private fun DeckCard(
         )
         if (languageFor(s.deck.targetLanguage)?.latin == false) {
             Text(
-                if (s.deck.romanize) "Latin letters: on · turn off" else "Latin letters: off · turn on",
+                "Show: ${s.deck.readingMode.label} · change",
                 style = FlashType.labelLg, color = c.inkSecondary,
                 modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onLatin).padding(vertical = 10.dp, horizontal = 4.dp),
             )
@@ -309,11 +327,11 @@ private fun BoxBar(counts: List<Int>) {
 }
 
 @Composable
-private fun NewDeckDialog(onDismiss: () -> Unit, onCreate: (String, String, String, Boolean) -> Unit) {
+private fun NewDeckDialog(onDismiss: () -> Unit, onCreate: (String, String, String, ReadingMode) -> Unit) {
     var name by rememberSaveable { mutableStateOf("") }
     var source by rememberSaveable { mutableStateOf("en") }
     var target by rememberSaveable { mutableStateOf("hr") }
-    var romanize by rememberSaveable { mutableStateOf(false) }
+    var mode by rememberSaveable { mutableStateOf(ReadingMode.SCRIPT) }
     val needsLatin = languageFor(target)?.latin == false
     AlertDialog(
         modifier = Modifier.padding(horizontal = 28.dp),
@@ -325,23 +343,11 @@ private fun NewDeckDialog(onDismiss: () -> Unit, onCreate: (String, String, Stri
                 OutlinedTextField(name, { name = it }, label = { Text("Deck name") }, singleLine = true)
                 LanguagePicker("My language", source, { source = it })
                 LanguagePicker("Language to Learn", target, { target = it })
-                if (needsLatin) {
-                    Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { romanize = !romanize }.padding(horizontal = 4.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Also store in Latin letters", style = FlashType.labelLg, color = LocalFlashColors.current.ink)
-                            Text("Adds how each card sounds, if you can't read the script.", style = FlashType.labelSm, color = LocalFlashColors.current.inkSecondary)
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        Switch(checked = romanize, onCheckedChange = { romanize = it })
-                    }
-                }
+                if (needsLatin) ReadingModePicker(mode, { mode = it })
             }
         },
         confirmButton = {
-            TextButton(onClick = { onCreate(name, source, target, needsLatin && romanize) }, enabled = name.isNotBlank() && source != target) { Text("Create") }
+            TextButton(onClick = { onCreate(name, source, target, if (needsLatin) mode else ReadingMode.SCRIPT) }, enabled = name.isNotBlank() && source != target) { Text("Create") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
@@ -366,6 +372,32 @@ private fun LanguagePicker(label: String, selected: String, onSelect: (String) -
             DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = c.surface, shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, c.divider)) {
                 Languages.forEach { lang ->
                     DropdownMenuItem(text = { LanguageLabel(lang) }, onClick = { onSelect(lang.code); open = false })
+                }
+            }
+        }
+    }
+}
+
+/** Dropdown for how a new Deck shows the language being learned: script, Latin letters or both. */
+@Composable
+private fun ReadingModePicker(selected: ReadingMode, onSelect: (ReadingMode) -> Unit) {
+    val c = LocalFlashColors.current
+    var open by remember { mutableStateOf(false) }
+    Column {
+        Text("Show cards in", style = FlashType.labelMd, color = c.inkSecondary)
+        Spacer(Modifier.height(4.dp))
+        Box {
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(1.dp, c.divider, RoundedCornerShape(12.dp))
+                    .clickable { open = true }.padding(horizontal = 12.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(selected.label, style = FlashType.bodyMd, color = c.ink, modifier = Modifier.weight(1f))
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = c.inkSecondary)
+            }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = c.surface, shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, c.divider)) {
+                ReadingMode.entries.forEach { option ->
+                    DropdownMenuItem(text = { Text(option.label, style = FlashType.bodyMd, color = c.ink) }, onClick = { onSelect(option); open = false })
                 }
             }
         }

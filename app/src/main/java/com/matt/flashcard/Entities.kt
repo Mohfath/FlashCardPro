@@ -14,7 +14,25 @@ data class Deck(
     val targetLanguage: String = "hr",
     /** Also keep a Latin-letter reading of each Card, for learners who cannot read the target script. */
     @ColumnInfo(defaultValue = "0") val romanize: Boolean = false,
-)
+    /** With [romanize] on: show only the Latin letters and hide the native script. */
+    @ColumnInfo(defaultValue = "0") val latinOnly: Boolean = false,
+) {
+    val readingMode: ReadingMode
+        get() = when {
+            !romanize -> ReadingMode.SCRIPT
+            latinOnly -> ReadingMode.LATIN
+            else -> ReadingMode.BOTH
+        }
+
+    fun withReadingMode(mode: ReadingMode) = copy(romanize = mode != ReadingMode.SCRIPT, latinOnly = mode == ReadingMode.LATIN)
+}
+
+/** How a Deck shows the language being learned: the native script, Latin letters, or both. */
+enum class ReadingMode(val label: String) {
+    SCRIPT("Native script only"),
+    LATIN("Latin letters only"),
+    BOTH("Native script and Latin letters"),
+}
 
 @Entity(
     tableName = "card",

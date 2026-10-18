@@ -21,11 +21,11 @@ class DeckListViewModel(app: Application) : AndroidViewModel(app) {
 
     val backfill = MutableStateFlow<Backfill?>(null)
 
-    /** Turns Latin letters on or off for a Deck; turning on can also fill in the Cards that are already there. */
-    fun setRomanize(deck: Deck, on: Boolean, fillExisting: Boolean) {
+    /** Sets how a Deck shows its target language; a mode with Latin letters can also fill in the Cards that are already there. */
+    fun setReadingMode(deck: Deck, mode: ReadingMode, fillExisting: Boolean) {
         viewModelScope.launch {
-            dao.updateDeck(deck.copy(romanize = on))
-            if (!on || !fillExisting) return@launch
+            dao.updateDeck(deck.withReadingMode(mode))
+            if (mode == ReadingMode.SCRIPT || !fillExisting) return@launch
             val todo = dao.cardsIn(deck.id).filter { it.romanization == null }
             if (todo.isEmpty()) return@launch
             val language = languageFor(deck.targetLanguage)?.name ?: deck.targetLanguage
@@ -70,7 +70,16 @@ class DeckListViewModel(app: Application) : AndroidViewModel(app) {
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), buildWeek(emptyList(), todayEpochDay()))
 
     init {
-        viewModelScope.launch { dao.seedIfEmpty() }
+        viewModelScope.launch {
+            dao.seedIfEmpty()
+            // Once per version, so a deck the learner deletes does not come back. Version 2 replaced the first,
+            // too-long 134-card list with 30 basic Cards.
+            if (prefs.getInt("persianStarterVersion", 0) < 2) {
+                dao.deckNamed("Persian Basics")?.let { dao.deleteDeck(it) }
+                dao.seedPersianStarter()
+                prefs.edit().putInt("persianStarterVersion", 2).apply()
+            }
+        }
     }
 
     /** Removes the Deck; its Cards go with it (cascade), and so do their audio files. */
@@ -82,11 +91,11 @@ class DeckListViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun createDeck(name: String, sourceLanguage: String, targetLanguage: String, romanize: Boolean) {
+    fun createDeck(name: String, sourceLanguage: String, targetLanguage: String, readingMode: ReadingMode) {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
         viewModelScope.launch {
-            select(dao.insertDeck(Deck(name = trimmed, sourceLanguage = sourceLanguage, targetLanguage = targetLanguage, romanize = romanize)))
+            select(dao.insertDeck(Deck(name = trimmed, sourceLanguage = sourceLanguage, targetLanguage = targetLanguage).withReadingMode(readingMode)))
         }
     }
 }

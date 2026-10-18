@@ -42,8 +42,6 @@ class ReviewViewModel(app: Application) : AndroidViewModel(app) {
     private val elevenLabs = ElevenLabsClient({ AppSettings(app).elevenLabsKey() })
     private var redoingAudio = false
     private var audioError: String? = null
-    private val prefs = app.getSharedPreferences("ui", android.content.Context.MODE_PRIVATE)
-    private var hideNative = prefs.getBoolean("hideNative", false)
     private var session: ReviewSession? = null
     private var deck: Deck? = null
 
@@ -103,12 +101,6 @@ class ReviewViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun toggleNative() {
-        hideNative = !hideNative
-        prefs.edit().putBoolean("hideNative", hideNative).apply()
-        publish()
-    }
-
     private fun act(block: ReviewSession.() -> Unit) {
         session?.block()
         publish()
@@ -131,12 +123,12 @@ class ReviewViewModel(app: Application) : AndroidViewModel(app) {
     private fun publish() {
         val s = session ?: return
         val d = deck ?: return
-        _ui.value = buildReviewUi(d, s, hideNative).copy(redoingAudio = redoingAudio, audioError = audioError)
+        _ui.value = buildReviewUi(d, s).copy(redoingAudio = redoingAudio, audioError = audioError)
     }
 }
 
 /** What the learner should see for the session's current Card; shared by the phone and the car. */
-internal fun buildReviewUi(d: Deck, s: ReviewSession, hideNative: Boolean = false): ReviewUi {
+internal fun buildReviewUi(d: Deck, s: ReviewSession): ReviewUi {
     val card = s.current
         ?: return ReviewUi(d.name, null, 0, "", "", "", "", false, false, 0, false)
     val srcToTarget = s.direction == Direction.SOURCE_TO_TARGET
@@ -157,7 +149,7 @@ internal fun buildReviewUi(d: Deck, s: ReviewSession, hideNative: Boolean = fals
         example = card.example,
         promptRomanization = if (srcToTarget) null else card.romanization,
         answerRomanization = if (srcToTarget) card.romanization else null,
-        hideNative = hideNative,
+        hideNative = d.readingMode == ReadingMode.LATIN,
         promptFlag = languageFor(if (srcToTarget) d.sourceLanguage else d.targetLanguage)?.flag.orEmpty(),
         answerFlag = languageFor(if (srcToTarget) d.targetLanguage else d.sourceLanguage)?.flag.orEmpty(),
     )

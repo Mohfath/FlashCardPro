@@ -64,10 +64,13 @@ class CardArtwork(context: Context) {
 
         // Prompt (and Answer): as large as fits, each followed by its Latin-letter reading when there is one.
         val promptSize = if (ui.revealed) 92f else 124f
-        val promptBlock = fit(ui.promptText, text(Color.WHITE, promptSize), width, maxLines = 3)
-        val promptReading = ui.promptRomanization?.let { fit(it, text(MUTED, 46f), width, maxLines = 2) }
-        val answerBlock = if (ui.revealed) fit(ui.answerText, text(look.accent, 96f), width, maxLines = 3) else null
-        val answerReading = if (ui.revealed) ui.answerRomanization?.let { fit(it, text(MUTED, 46f), width, maxLines = 2) } else null
+        // A Deck that shows Latin letters only draws the reading in place of the native script.
+        val promptLatin = ui.promptRomanization?.takeIf { ui.hideNative }
+        val answerLatin = ui.answerRomanization?.takeIf { ui.hideNative }
+        val promptBlock = fit(promptLatin ?: ui.promptText, text(Color.WHITE, promptSize), width, maxLines = 3)
+        val promptReading = ui.promptRomanization?.takeIf { promptLatin == null }?.let { fit(it, text(MUTED, 46f), width, maxLines = 2) }
+        val answerBlock = if (ui.revealed) fit(answerLatin ?: ui.answerText, text(look.accent, 96f), width, maxLines = 3) else null
+        val answerReading = if (ui.revealed) ui.answerRomanization?.takeIf { answerLatin == null }?.let { fit(it, text(MUTED, 46f), width, maxLines = 2) } else null
 
         val gap = 28f
         val ruleGap = 48f

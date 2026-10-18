@@ -65,7 +65,6 @@ class MainActivity : ComponentActivity() {
                         onReveal = review::reveal,
                         onAnswer = review::answer,
                         onDelete = review::delete,
-                        onToggleNative = review::toggleNative,
                         onRedoAudio = review::redoAudio,
                     )
                     importDeckId != null -> ImportScreen(
@@ -97,7 +96,7 @@ class MainActivity : ComponentActivity() {
                         onCreate = deckList::createDeck,
                         onDeleteDeck = deckList::deleteDeck,
                         backfill = deckList.backfill.collectAsState().value,
-                        onSetRomanize = deckList::setRomanize,
+                        onSetReading = deckList::setReadingMode,
                         onDismissBackfill = deckList::dismissBackfill,
                     )
                 }
