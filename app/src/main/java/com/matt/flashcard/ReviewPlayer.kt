@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Presents a review session to Android Auto as a media player: play/pause = Reveal, and the two buttons the
+ * Presents a review session to Android Auto as a media player: play/pause = Reveal (and, once revealed, hear it again), and the two buttons the
  * service adds (check = Know, cross = Again) call [answer]. The steering-wheel next and previous keys map to the
  * same two answers. Deleting a Card is left to the phone, since nobody should do that while driving.
  */
@@ -84,9 +84,14 @@ class ReviewPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) 
         if (playWhenReady && SystemClock.elapsedRealtime() >= ignorePlayUntil) {
             val s = session
             val before = ui
-            if (s != null && s.current != null && !s.revealed) {
-                s.reveal()
-                refresh(before)
+            if (s != null && s.current != null) {
+                if (!s.revealed) {
+                    s.reveal()
+                    refresh(before)
+                } else {
+                    // Play again after the Reveal: hear the target-language side once more, as often as wanted.
+                    ui?.let { u -> (u.promptAudio ?: u.answerAudio)?.let(speaker::play) }
+                }
             }
         }
         return Futures.immediateVoidFuture()

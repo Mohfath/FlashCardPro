@@ -19,4 +19,13 @@ class CardFontSizeTest {
     }
 
     @Test fun neverSmallerThanTheFloor() = assertTrue(cardFontSize("Donaudampfschifffahrtsgesellschaft " + "word ".repeat(40)) >= 22)
+
+    @Test fun roomForTheSpeakerButtonMakesLongWordsSmaller() {
+        assertTrue(cardFontSize("understand.", speakerShown = true) < cardFontSize("understand.", speakerShown = false))
+    }
+
+    @Test fun elevenLetterWordFitsWithoutBreaking() {
+        // 11 letters of a bold font (0.72 em each) must fit in 250 dp
+        assertTrue(cardFontSize("understand.") * 0.72 * 11 <= 250)
+    }
 }

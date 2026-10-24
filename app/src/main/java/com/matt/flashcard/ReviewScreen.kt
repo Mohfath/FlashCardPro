@@ -272,8 +272,6 @@ private fun CardFace(ui: ReviewUi, onPlay: (String) -> Unit, onReveal: () -> Uni
                     Modifier.fillMaxWidth().heightIn(min = minHeight).padding(horizontal = 28.dp, vertical = 24.dp),
                     verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    SideLabel("PROMPT · ${ui.promptLanguage}")
-                    Spacer(Modifier.height(12.dp))
                     CardText(ui.promptText, c.ink, ui.promptAudio, onPlay, ui.promptRomanization, ui.hideNative)
                     // The Answer eases in. No exit animation: on the next Card the old Answer must vanish at once, not fade over the new Prompt.
                     AnimatedVisibility(
@@ -285,8 +283,6 @@ private fun CardFace(ui: ReviewUi, onPlay: (String) -> Unit, onReveal: () -> Uni
                             Spacer(Modifier.height(24.dp))
                             Box(Modifier.fillMaxWidth(0.4f).height(1.dp).background(c.divider))
                             Spacer(Modifier.height(24.dp))
-                            SideLabel("ANSWER · ${ui.answerLanguage}")
-                            Spacer(Modifier.height(12.dp))
                             CardText(ui.answerText, c.accent, ui.answerAudio, onPlay, ui.answerRomanization, ui.hideNative)
                             if (!ui.example.isNullOrBlank()) {
                                 Spacer(Modifier.height(24.dp))
@@ -310,9 +306,9 @@ private fun SideLabel(label: String) {
 
 /**
  * Font size for Card text: big for single words, smaller for long sentences, and small enough that the longest
- * word never has to break in the middle (about 270 dp of card width, an average letter being 0.62 em wide).
+ * word never has to break in the middle (about 250 dp of card width, a bold letter being about 0.72 em wide).
  */
-internal fun cardFontSize(text: String): Int {
+internal fun cardFontSize(text: String, speakerShown: Boolean = false): Int {
     val byLength = when {
         text.length <= 12 -> 48
         text.length <= 30 -> 40
@@ -320,12 +316,13 @@ internal fun cardFontSize(text: String): Int {
         else -> 26
     }
     val longestWord = text.split(' ', '\n').maxOf { it.length }.coerceAtLeast(1)
-    val byWord = (270 / (0.62 * longestWord)).toInt()
+    val room = if (speakerShown) 196 else 250 // dp of text width; the speaker button takes the rest
+    val byWord = (room / (0.72 * longestWord)).toInt()
     return minOf(byLength, byWord).coerceAtLeast(22)
 }
 
-private fun cardTextStyle(text: String): androidx.compose.ui.text.TextStyle {
-    val size = cardFontSize(text)
+private fun cardTextStyle(text: String, speakerShown: Boolean): androidx.compose.ui.text.TextStyle {
+    val size = cardFontSize(text, speakerShown)
     return FlashType.bodyXl.copy(fontSize = size.sp, lineHeight = (size * 1.25f).sp)
 }
 
@@ -343,9 +340,9 @@ private fun CardText(
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
         Column(Modifier.weight(1f, fill = false), horizontalAlignment = Alignment.CenterHorizontally) {
             if (romanization != null && hideNative) {
-                Text(romanization, style = cardTextStyle(romanization), color = color, textAlign = TextAlign.Center)
+                Text(romanization, style = cardTextStyle(romanization, audio != null), color = color, textAlign = TextAlign.Center)
             } else {
-                Text(text, style = cardTextStyle(text), color = color, textAlign = TextAlign.Center)
+                Text(text, style = cardTextStyle(text, audio != null), color = color, textAlign = TextAlign.Center)
                 if (romanization != null) {
                     Spacer(Modifier.height(4.dp))
                     Text(romanization, style = FlashType.bodyMd, color = c.inkSecondary, textAlign = TextAlign.Center)
@@ -353,10 +350,11 @@ private fun CardText(
             }
         }
         if (audio != null) {
-            Text(
-                "🔊", style = FlashType.headlineSm,
-                modifier = Modifier.padding(start = 8.dp).clip(CircleShape).clickable { onPlay(audio) }.padding(8.dp),
-            )
+            Box(
+                Modifier.padding(start = 10.dp).size(44.dp).clip(CircleShape).background(c.inset)
+                    .semantics { contentDescription = "Listen again" }.clickable { onPlay(audio) },
+                contentAlignment = Alignment.Center,
+            ) { Text("🔊", style = FlashType.headlineSm) }
         }
     }
 }
