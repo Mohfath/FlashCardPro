@@ -29,6 +29,7 @@ class MainActivity : ComponentActivity() {
     private val review: ReviewViewModel by viewModels()
     private val addCard: AddCardViewModel by viewModels()
     private val importer: ImportViewModel by viewModels()
+    private val library: LibraryViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,12 +42,15 @@ class MainActivity : ComponentActivity() {
                 var addCardDeckId by rememberSaveable { mutableStateOf<Long?>(null) }
                 var settingsOpen by rememberSaveable { mutableStateOf(false) }
                 var importDeckId by rememberSaveable { mutableStateOf<Long?>(null) }
+                var libraryDeckId by rememberSaveable { mutableStateOf<Long?>(null) }
 
                 LaunchedEffect(reviewDeckId) { reviewDeckId?.let(review::open) ?: review.close() }
                 LaunchedEffect(addCardDeckId) { addCardDeckId?.let(addCard::open) ?: addCard.close() }
                 LaunchedEffect(importDeckId) { importDeckId?.let(importer::open) ?: importer.close() }
-                BackHandler(enabled = reviewDeckId != null || addCardDeckId != null || settingsOpen) {
+                LaunchedEffect(libraryDeckId) { libraryDeckId?.let(library::open) ?: library.close() }
+                BackHandler(enabled = reviewDeckId != null || addCardDeckId != null || libraryDeckId != null || settingsOpen) {
                     if (settingsOpen) { settingsOpen = false; return@BackHandler }
+                    if (libraryDeckId != null) { libraryDeckId = null; return@BackHandler }
                     // From the import page, back goes to Add Card; from there, back to the deck list.
                     if (importDeckId != null) importDeckId = null
                     else {
@@ -66,6 +70,12 @@ class MainActivity : ComponentActivity() {
                         onAnswer = review::answer,
                         onDelete = review::delete,
                         onRedoAudio = review::redoAudio,
+                    )
+                    libraryDeckId != null -> LibraryScreen(
+                        ui = library.ui.collectAsState().value,
+                        onBack = { libraryDeckId = null },
+                        onCopy = library::copy,
+                        onDismissNote = library::dismissNote,
                     )
                     importDeckId != null -> ImportScreen(
                         ui = importer.ui.collectAsState().value,
@@ -93,6 +103,7 @@ class MainActivity : ComponentActivity() {
                         onSelect = deckList::select,
                         onOpen = { reviewDeckId = it },
                         onAddCard = { addCardDeckId = it },
+                        onLibrary = { libraryDeckId = it },
                         onCreate = deckList::createDeck,
                         onDeleteDeck = deckList::deleteDeck,
                         backfill = deckList.backfill.collectAsState().value,
@@ -105,7 +116,7 @@ class MainActivity : ComponentActivity() {
                     Modifier.align(Alignment.TopEnd).safeDrawingPadding().padding(top = 4.dp, end = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    if (!settingsOpen && reviewDeckId == null && addCardDeckId == null && importDeckId == null) {
+                    if (!settingsOpen && reviewDeckId == null && addCardDeckId == null && importDeckId == null && libraryDeckId == null) {
                         CornerButton("⚙️", "Settings") { settingsOpen = true }
                     }
                     ThemePicker(theme, { theme = it; prefs.edit().putString("theme", it.name).apply() })

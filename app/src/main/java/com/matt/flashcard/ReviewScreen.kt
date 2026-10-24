@@ -294,16 +294,24 @@ private fun SideLabel(label: String) {
     Text(label, style = FlashType.labelMd, color = c.inkSecondary)
 }
 
-/** Font size for Card text: big for single words, shrinking so long sentences still fit the card. */
-internal fun cardFontSize(length: Int): Int = when {
-    length <= 12 -> 48
-    length <= 30 -> 40
-    length <= 60 -> 32
-    else -> 26
+/**
+ * Font size for Card text: big for single words, smaller for long sentences, and small enough that the longest
+ * word never has to break in the middle (about 270 dp of card width, an average letter being 0.62 em wide).
+ */
+internal fun cardFontSize(text: String): Int {
+    val byLength = when {
+        text.length <= 12 -> 48
+        text.length <= 30 -> 40
+        text.length <= 60 -> 32
+        else -> 26
+    }
+    val longestWord = text.split(' ', '\n').maxOf { it.length }.coerceAtLeast(1)
+    val byWord = (270 / (0.62 * longestWord)).toInt()
+    return minOf(byLength, byWord).coerceAtLeast(22)
 }
 
 private fun cardTextStyle(text: String): androidx.compose.ui.text.TextStyle {
-    val size = cardFontSize(text.length)
+    val size = cardFontSize(text)
     return FlashType.bodyXl.copy(fontSize = size.sp, lineHeight = (size * 1.25f).sp)
 }
 

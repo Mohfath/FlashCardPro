@@ -64,4 +64,6 @@ data class Card(
     val example: String? = null,
     /** The target text written in Latin letters; only set for Decks that romanize. */
     val romanization: String? = null,
+    /** Set for Cards copied from the Library: "<categoryId>/<position>", so a category can be recognised and not copied twice. */
+    val libraryId: String? = null,
 )

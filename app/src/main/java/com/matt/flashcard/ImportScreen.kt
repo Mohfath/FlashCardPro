@@ -149,7 +149,7 @@ internal fun Choice(label: String, selected: Boolean, enabled: Boolean, onClick:
 }
 
 @Composable
-private fun ImportButton(label: String, enabled: Boolean, onClick: () -> Unit, filled: Boolean = true) {
+internal fun ImportButton(label: String, enabled: Boolean, onClick: () -> Unit, filled: Boolean = true) {
     val c = LocalFlashColors.current
     val shape = RoundedCornerShape(16.dp)
     Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {

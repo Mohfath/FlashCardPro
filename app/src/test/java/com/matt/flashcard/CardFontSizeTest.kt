@@ -5,13 +5,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CardFontSizeTest {
-    @Test fun singleWordsAreBig() = assertEquals(48, cardFontSize("midunam".length))
+    @Test fun shortWordsAreBig() = assertEquals(48, cardFontSize("midunam"))
 
     @Test fun longerTextGetsSmaller() {
-        val sizes = listOf(5, 20, 45, 120).map(::cardFontSize)
+        val sizes = listOf("Hi", "How are you today?", "Could you please tell me where the station is?", "x ".repeat(60)).map(::cardFontSize)
         assertEquals(sizes.sortedDescending(), sizes)
         assertTrue(sizes.first() > sizes.last())
     }
 
-    @Test fun neverSmallerThanTheOldSize() = assertTrue(cardFontSize(500) >= 24)
+    @Test fun aLongWordGetsSmallerSoItDoesNotBreak() {
+        assertTrue(cardFontSize("Nachmittag") < 48)
+        assertTrue(cardFontSize("Entschuldigung") < cardFontSize("Nachmittag"))
+    }
+
+    @Test fun neverSmallerThanTheFloor() = assertTrue(cardFontSize("Donaudampfschifffahrtsgesellschaft " + "word ".repeat(40)) >= 22)
 }

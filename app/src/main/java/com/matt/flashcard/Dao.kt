@@ -32,6 +32,8 @@ interface FlashcardDao {
     @Query("SELECT * FROM practice_day WHERE day >= :from") fun practiceSince(from: Long): Flow<List<PracticeDay>>
     @Query("SELECT * FROM card") fun allCards(): Flow<List<Card>>
     @Query("SELECT * FROM card WHERE deckId = :deckId") suspend fun cardsIn(deckId: Long): List<Card>
+    @Query("SELECT libraryId FROM card WHERE deckId = :deckId AND libraryId IS NOT NULL") fun libraryIdsIn(deckId: Long): Flow<List<String>>
+    @Insert suspend fun insertCards(cards: List<Card>)
 }
 
 private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -67,7 +69,13 @@ private val MIGRATION_5_6 = object : Migration(5, 6) {
     }
 }
 
-@Database(entities = [Deck::class, Card::class, PracticeDay::class], version = 6, exportSchema = false)
+private val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE card ADD COLUMN libraryId TEXT")
+    }
+}
+
+@Database(entities = [Deck::class, Card::class, PracticeDay::class], version = 7, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): FlashcardDao
 
@@ -76,7 +84,7 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun get(context: Context): AppDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "flashcards.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .build().also { instance = it }
         }
     }

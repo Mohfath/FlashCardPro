@@ -56,7 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun DeckListScreen(decks: List<DeckSummary>?, week: List<DayCount>, selectedId: Long, onSelect: (Long) -> Unit, onOpen: (Long) -> Unit, onAddCard: (Long) -> Unit, onCreate: (String, String, String, ReadingMode, Formality) -> Unit, onDeleteDeck: (Deck) -> Unit,
+fun DeckListScreen(decks: List<DeckSummary>?, week: List<DayCount>, selectedId: Long, onSelect: (Long) -> Unit, onOpen: (Long) -> Unit, onAddCard: (Long) -> Unit, onLibrary: (Long) -> Unit, onCreate: (String, String, String, ReadingMode, Formality) -> Unit, onDeleteDeck: (Deck) -> Unit,
     backfill: Backfill?, onSetReading: (Deck, ReadingMode, Boolean) -> Unit, onSetFormality: (Deck, Formality) -> Unit, onDismissBackfill: () -> Unit,
 ) {
     val c = LocalFlashColors.current
@@ -87,7 +87,7 @@ fun DeckListScreen(decks: List<DeckSummary>?, week: List<DayCount>, selectedId: 
                     DeckPicker(decks, active, onSelect)
                     Spacer(Modifier.height(16.dp))
                     Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                        DeckCard(active, onClick = { onOpen(active.deck.id) }, onAddCard = { onAddCard(active.deck.id) }, onDelete = { deleting = active },
+                        DeckCard(active, onClick = { onOpen(active.deck.id) }, onAddCard = { onAddCard(active.deck.id) }, onLibrary = { onLibrary(active.deck.id) }, onDelete = { deleting = active },
                             backfill = backfill?.takeIf { it.deckId == active.deck.id }, onDismissBackfill = onDismissBackfill,
                             onLatin = { choosingReading = active }, onTone = { choosingTone = active },
                         )
@@ -235,7 +235,7 @@ private fun EmptyState(modifier: Modifier) {
 @Composable
 private fun DeckCard(
     s: DeckSummary, onClick: () -> Unit, onAddCard: () -> Unit, onDelete: () -> Unit,
-    backfill: Backfill?, onDismissBackfill: () -> Unit, onLatin: () -> Unit, onTone: () -> Unit,
+    backfill: Backfill?, onDismissBackfill: () -> Unit, onLatin: () -> Unit, onTone: () -> Unit, onLibrary: () -> Unit,
 ) {
     val c = LocalFlashColors.current
     val canReview = s.total > 0
@@ -271,6 +271,10 @@ private fun DeckCard(
         Text(
             "+  Add Card", style = FlashType.labelLg, color = c.accent,
             modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onAddCard).padding(vertical = 10.dp, horizontal = 4.dp),
+        )
+        Text(
+            "📚  Library", style = FlashType.labelLg, color = c.accent,
+            modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onLibrary).padding(vertical = 10.dp, horizontal = 4.dp),
         )
         if (languageFor(s.deck.targetLanguage)?.latin == false) {
             Text(
