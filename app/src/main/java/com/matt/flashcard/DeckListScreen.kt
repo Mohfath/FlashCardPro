@@ -67,14 +67,13 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun DeckListScreen(decks: List<DeckSummary>?, week: List<DayCount>, selectedId: Long, onSelect: (Long) -> Unit, onOpen: (Long) -> Unit, onAddCard: (Long) -> Unit, onLibrary: (Long) -> Unit, onCreate: (String, String, String, ReadingMode, Formality) -> Unit, onDeleteDeck: (Deck) -> Unit,
-    backfill: Backfill?, onSetReading: (Deck, ReadingMode, Boolean) -> Unit, onSetFormality: (Deck, Formality) -> Unit, onDismissBackfill: () -> Unit,
+    onSetFormality: (Deck, Formality) -> Unit,
     missingAudio: MissingAudio?, onRedoMissingAudio: (Deck) -> Unit, onDismissMissingAudio: () -> Unit,
     headerActions: @Composable RowScope.() -> Unit,
 ) {
     val c = LocalFlashColors.current
     var creating by rememberSaveable { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<DeckSummary?>(null) }
-    var choosingReading by remember { mutableStateOf<DeckSummary?>(null) }
     var choosingTone by remember { mutableStateOf<DeckSummary?>(null) }
     var confirmingAudio by remember { mutableStateOf<DeckSummary?>(null) }
 
@@ -106,9 +105,8 @@ fun DeckListScreen(decks: List<DeckSummary>?, week: List<DayCount>, selectedId: 
                     DeckCarousel(
                         decks, selectedId, onSelect,
                         onOpen = onOpen, onAddCard = onAddCard, onLibrary = onLibrary,
-                        onDelete = { deleting = it }, onLatin = { choosingReading = it }, onTone = { choosingTone = it },
+                        onDelete = { deleting = it }, onTone = { choosingTone = it },
                         onRedoAudio = { confirmingAudio = it },
-                        backfill = backfill, onDismissBackfill = onDismissBackfill,
                         missingAudio = missingAudio, onDismissMissingAudio = onDismissMissingAudio,
                         modifier = Modifier.weight(1f),
                     )
@@ -166,47 +164,6 @@ fun DeckListScreen(decks: List<DeckSummary>?, week: List<DayCount>, selectedId: 
         )
     }
 
-    choosingReading?.let { s ->
-        var mode by remember(s.deck.id) { mutableStateOf(s.deck.readingMode) }
-        // Cards written before Latin letters were on have no reading yet; offer to write them.
-        val missing = if (mode != ReadingMode.SCRIPT && !s.deck.romanize) s.total else 0
-        AlertDialog(
-            modifier = Modifier.padding(horizontal = 28.dp),
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-            onDismissRequest = { choosingReading = null },
-            title = { Text("How to show cards") },
-            text = {
-                Column {
-                    ReadingMode.entries.forEach { option ->
-                        Row(
-                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { mode = option }.padding(vertical = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(selected = mode == option, onClick = { mode = option })
-                            Text(option.label, style = FlashType.bodyMd, color = c.ink)
-                        }
-                    }
-                    if (missing > 0) {
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            "Also write Latin letters for the $missing card${if (missing == 1) "" else "s"} already in this deck? That makes $missing request${if (missing == 1) "" else "s"} to your AI service.",
-                            style = FlashType.labelMd, color = c.inkSecondary,
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { onSetReading(s.deck, mode, missing > 0); choosingReading = null }) { Text(if (missing > 0) "Apply and fill in" else "Apply") }
-            },
-            dismissButton = {
-                Row {
-                    if (missing > 0) TextButton(onClick = { onSetReading(s.deck, mode, false); choosingReading = null }) { Text("New cards only") }
-                    TextButton(onClick = { choosingReading = null }) { Text("Cancel") }
-                }
-            },
-        )
-    }
-
     deleting?.let { s ->
         AlertDialog(
             modifier = Modifier.padding(horizontal = 28.dp),
@@ -241,8 +198,8 @@ private fun EmptyState(modifier: Modifier) {
 private fun DeckCarousel(
     decks: List<DeckSummary>, selectedId: Long, onSelect: (Long) -> Unit,
     onOpen: (Long) -> Unit, onAddCard: (Long) -> Unit, onLibrary: (Long) -> Unit,
-    onDelete: (DeckSummary) -> Unit, onLatin: (DeckSummary) -> Unit, onTone: (DeckSummary) -> Unit, onRedoAudio: (DeckSummary) -> Unit,
-    backfill: Backfill?, onDismissBackfill: () -> Unit, missingAudio: MissingAudio?, onDismissMissingAudio: () -> Unit,
+    onDelete: (DeckSummary) -> Unit, onTone: (DeckSummary) -> Unit, onRedoAudio: (DeckSummary) -> Unit,
+    missingAudio: MissingAudio?, onDismissMissingAudio: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = LocalFlashColors.current
@@ -269,8 +226,7 @@ private fun DeckCarousel(
             DeckCard(
                 s,
                 onOpen = { onOpen(s.deck.id) }, onAddCard = { onAddCard(s.deck.id) }, onLibrary = { onLibrary(s.deck.id) },
-                onDelete = { onDelete(s) }, onLatin = { onLatin(s) }, onTone = { onTone(s) }, onRedoAudio = { onRedoAudio(s) },
-                backfill = backfill?.takeIf { it.deckId == s.deck.id }, onDismissBackfill = onDismissBackfill,
+                onDelete = { onDelete(s) }, onTone = { onTone(s) }, onRedoAudio = { onRedoAudio(s) },
                 missingAudio = missingAudio?.takeIf { it.deckId == s.deck.id }, onDismissMissingAudio = onDismissMissingAudio,
             )
         }
@@ -292,8 +248,8 @@ private fun DeckCarousel(
 @Composable
 private fun DeckCard(
     s: DeckSummary, onOpen: () -> Unit, onAddCard: () -> Unit, onLibrary: () -> Unit, onDelete: () -> Unit,
-    onLatin: () -> Unit, onTone: () -> Unit, onRedoAudio: () -> Unit,
-    backfill: Backfill?, onDismissBackfill: () -> Unit, missingAudio: MissingAudio?, onDismissMissingAudio: () -> Unit,
+    onTone: () -> Unit, onRedoAudio: () -> Unit,
+    missingAudio: MissingAudio?, onDismissMissingAudio: () -> Unit,
 ) {
     val c = LocalFlashColors.current
     val shape = RoundedCornerShape(32.dp)
@@ -305,7 +261,7 @@ private fun DeckCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             LanguageBadge(s.deck)
             Spacer(Modifier.weight(1f))
-            DeckMenu(s, onAddCard, onLibrary, onLatin, onTone, onRedoAudio, onDelete)
+            DeckMenu(s, onAddCard, onLibrary, onTone, onRedoAudio, onDelete)
         }
         Spacer(Modifier.height(16.dp))
         Text(s.deck.name, style = FlashType.headlineMd.copy(fontSize = 26.sp, lineHeight = 32.sp), color = c.ink, maxLines = 2)
@@ -314,18 +270,6 @@ private fun DeckCard(
         BoxBar(s.boxCounts)
         Spacer(Modifier.height(20.dp))
         ReviewButton(reviewAction(s.total, s.due), onOpen)
-        if (backfill != null) {
-            Spacer(Modifier.height(10.dp))
-            Text(
-                when {
-                    backfill.error != null -> "Stopped at ${backfill.done} of ${backfill.total}: ${backfill.error}"
-                    backfill.finished -> "Latin letters added to ${backfill.done} card${if (backfill.done == 1) "" else "s"}."
-                    else -> "Writing Latin letters… ${backfill.done} of ${backfill.total}"
-                },
-                style = FlashType.labelMd, color = if (backfill.error != null) c.danger else c.accent,
-                modifier = Modifier.clickable(enabled = backfill.finished, onClick = onDismissBackfill),
-            )
-        }
         if (missingAudio != null) {
             Spacer(Modifier.height(10.dp))
             Text(
@@ -388,7 +332,7 @@ private fun ReviewButton(action: ReviewAction, onClick: () -> Unit) {
 /** The three-dot menu of a Deck card. */
 @Composable
 private fun DeckMenu(
-    s: DeckSummary, onAddCard: () -> Unit, onLibrary: () -> Unit, onLatin: () -> Unit, onTone: () -> Unit, onRedoAudio: () -> Unit, onDelete: () -> Unit,
+    s: DeckSummary, onAddCard: () -> Unit, onLibrary: () -> Unit, onTone: () -> Unit, onRedoAudio: () -> Unit, onDelete: () -> Unit,
 ) {
     val c = LocalFlashColors.current
     var open by remember { mutableStateOf(false) }
@@ -416,7 +360,6 @@ private fun DeckMenu(
         DropdownMenu(open, { open = false }, containerColor = c.surface, shape = RoundedCornerShape(18.dp), border = BorderStroke(1.dp, c.divider)) {
             item("+", "Add Card", onClick = onAddCard)
             item("📚", "Deck Library", onClick = onLibrary)
-            if (languageFor(s.deck.targetLanguage)?.latin == false) item("Aa", "Show cards in…", onClick = onLatin)
             if (supportsFormality(s.deck.targetLanguage)) item("💬", "Tone…", onClick = onTone)
             item("🔊", "Redo Missing Audio", onClick = onRedoAudio)
             HorizontalDivider(color = c.divider)
@@ -537,7 +480,7 @@ private fun ReadingModePicker(selected: ReadingMode, onSelect: (ReadingMode) -> 
     val c = LocalFlashColors.current
     var open by remember { mutableStateOf(false) }
     Column {
-        Text("Show cards in", style = FlashType.labelMd, color = c.inkSecondary)
+        Text("Alphabet to learn with", style = FlashType.labelMd, color = c.inkSecondary)
         Spacer(Modifier.height(4.dp))
         Box {
             Row(

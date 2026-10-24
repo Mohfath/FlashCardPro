@@ -12,7 +12,7 @@ class ReadingModeTest {
 
     @Test fun modeIsReadFromTheTwoDeckFlags() {
         assertEquals(ReadingMode.SCRIPT, Deck(name = "a").readingMode)
-        assertEquals(ReadingMode.BOTH, Deck(name = "a", romanize = true).readingMode)
+        assertEquals(ReadingMode.LATIN, Deck(name = "a", romanize = true).readingMode)
         assertEquals(ReadingMode.LATIN, Deck(name = "a", romanize = true, latinOnly = true).readingMode)
     }
 
@@ -24,9 +24,12 @@ class ReadingModeTest {
         assertTrue(reviewUi(ReadingMode.LATIN).hideNative)
     }
 
-    @Test fun scriptAndBothDecksKeepTheScript() {
+    @Test fun scriptDecksKeepTheScript() {
         assertFalse(reviewUi(ReadingMode.SCRIPT).hideNative)
-        assertFalse(reviewUi(ReadingMode.BOTH).hideNative)
+    }
+
+    @Test fun thereAreOnlyTwoAlphabetsToChooseFrom() {
+        assertEquals(listOf(ReadingMode.SCRIPT, ReadingMode.LATIN), ReadingMode.entries)
     }
 
     @Test fun carTextUsesLatinForLatinOnlyDecks() {

@@ -12,14 +12,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/** Progress of writing Latin-letter readings for the Cards a Deck already had when the option was switched on. */
-data class Backfill(val deckId: Long, val done: Int, val total: Int, val finished: Boolean = false, val error: String? = null)
-
 class DeckListViewModel(app: Application) : AndroidViewModel(app) {
     private val dao = AppDatabase.get(app).dao()
-    private val romanizer = Romanizer(AppSettings(app))
-
-    val backfill = MutableStateFlow<Backfill?>(null)
 
     private val audio = AudioStore(app)
     private val elevenLabs = ElevenLabsClient({ AppSettings(app).elevenLabsKey() })
@@ -51,33 +45,6 @@ class DeckListViewModel(app: Application) : AndroidViewModel(app) {
         missingAudio.value = null
     }
 
-    /** Sets how a Deck shows its target language; a mode with Latin letters can also fill in the Cards that are already there. */
-    fun setReadingMode(deck: Deck, mode: ReadingMode, fillExisting: Boolean) {
-        viewModelScope.launch {
-            dao.updateDeck(deck.withReadingMode(mode))
-            if (mode == ReadingMode.SCRIPT || !fillExisting) return@launch
-            val todo = dao.cardsIn(deck.id).filter { it.romanization == null }
-            if (todo.isEmpty()) return@launch
-            val language = languageFor(deck.targetLanguage)?.name ?: deck.targetLanguage
-            var done = 0
-            backfill.value = Backfill(deck.id, 0, todo.size)
-            for (card in todo) {
-                try {
-                    dao.setRomanization(card.id, romanizer.romanize(card.targetText, language))
-                    done++
-                    backfill.value = Backfill(deck.id, done, todo.size)
-                } catch (e: RomanizationException) {
-                    backfill.value = Backfill(deck.id, done, todo.size, finished = true, error = e.message)
-                    return@launch
-                }
-            }
-            backfill.value = Backfill(deck.id, done, todo.size, finished = true)
-        }
-    }
-
-    fun dismissBackfill() {
-        backfill.value = null
-    }
     private val prefs = app.getSharedPreferences("ui", Context.MODE_PRIVATE)
 
     /** The Deck shown on the first screen; -1 until one is picked (the screen then falls back to the first Deck). */

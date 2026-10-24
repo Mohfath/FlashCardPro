@@ -81,16 +81,18 @@ fun AddCardScreen(
                 Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                FieldCard(
-                    flag = ui.targetFlag, label = "LANGUAGE TO LEARN · ${ui.targetLabel}",
-                    value = ui.target, onChange = onTargetChange, color = c.ink, size = 20.sp, lines = 3,
-                    diacritics = ui.targetCode == "hr",
-                )
                 if (ui.romanize) {
+                    // A Latin-letters Deck is learned in Latin letters: the native script is filled in behind the scenes (for the audio) and not shown.
                     FieldCard(
-                        flag = "🔤", label = "LATIN LETTERS · HOW IT SOUNDS",
+                        flag = ui.targetFlag, label = "LANGUAGE TO LEARN · ${ui.targetLabel} · LATIN LETTERS",
                         value = ui.romanization, onChange = onRomanizationChange, color = c.ink, size = 20.sp, lines = 2,
-                        badge = if (ui.romanizing) "Romanizing…" else "Auto",
+                        badge = if (ui.romanizing || ui.translatingInto == Side.TARGET) "Writing…" else "Auto",
+                    )
+                } else {
+                    FieldCard(
+                        flag = ui.targetFlag, label = "LANGUAGE TO LEARN · ${ui.targetLabel}",
+                        value = ui.target, onChange = onTargetChange, color = c.ink, size = 20.sp, lines = 3,
+                        diacritics = ui.targetCode == "hr",
                     )
                 }
                 FieldCard(

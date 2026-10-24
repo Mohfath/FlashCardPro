@@ -23,14 +23,10 @@ data class Deck(
 
     fun withFormality(f: Formality) = copy(formalityCode = f.ordinal)
 
-    val readingMode: ReadingMode
-        get() = when {
-            !romanize -> ReadingMode.SCRIPT
-            latinOnly -> ReadingMode.LATIN
-            else -> ReadingMode.BOTH
-        }
+    /** Fixed when the Deck is made: Cards are shown in the native script, or in Latin letters. */
+    val readingMode: ReadingMode get() = if (romanize) ReadingMode.LATIN else ReadingMode.SCRIPT
 
-    fun withReadingMode(mode: ReadingMode) = copy(romanize = mode != ReadingMode.SCRIPT, latinOnly = mode == ReadingMode.LATIN)
+    fun withReadingMode(mode: ReadingMode) = copy(romanize = mode == ReadingMode.LATIN, latinOnly = mode == ReadingMode.LATIN)
 }
 
 /** Tone of translations. [deepL] is DeepL's "prefer" value, which is ignored (not an error) for languages without the feature. */
@@ -40,11 +36,10 @@ enum class Formality(val label: String, val deepL: String?) {
     AUTO("Automatic", null),
 }
 
-/** How a Deck shows the language being learned: the native script, Latin letters, or both. */
+/** The alphabet a Deck is learned in: the language's own script, or Latin letters. */
 enum class ReadingMode(val label: String) {
-    SCRIPT("Native script only"),
-    LATIN("Latin letters only"),
-    BOTH("Native script and Latin letters"),
+    SCRIPT("Native script"),
+    LATIN("Latin letters"),
 }
 
 @Entity(

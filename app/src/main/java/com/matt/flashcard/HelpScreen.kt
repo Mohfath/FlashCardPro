@@ -29,7 +29,7 @@ val helpSections: List<HelpSection> = listOf(
         "Getting started",
         listOf(
             "Open Settings (the gear) and add your own keys: DeepL translates, ElevenLabs speaks, and Claude, Gemini or OpenAI writes Latin letters. Keys stay on this phone.",
-            "Tap + New Deck, name it, and pick the language you know and the language you want to learn.",
+            "Tap + New Deck, name it, and pick the language you know and the language you want to learn. For languages like Persian, Arabic or Japanese you also choose once whether to learn them in their own script or in Latin letters.",
         ),
     ),
     HelpSection(
@@ -58,7 +58,6 @@ val helpSections: List<HelpSection> = listOf(
     HelpSection(
         "Deck options (the three dots)",
         listOf(
-            "Show cards in: for languages like Persian, Arabic or Japanese, show the native script, Latin letters, or both.",
             "Tone: for languages that have it, translate informally (default) or formally.",
             "Redo Missing Audio: make audio for the cards that have none. It uses ElevenLabs credits.",
             "Delete Deck: removes the deck and all its cards for good.",
