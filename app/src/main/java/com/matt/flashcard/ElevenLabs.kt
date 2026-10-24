@@ -21,11 +21,17 @@ private val V3_ONLY_LANGUAGES = setOf("fa", "th", "hu", "vi")
 
 internal fun needsV3(languageCode: String?) = languageCode?.lowercase() in V3_ONLY_LANGUAGES
 
+/** Lower stability and some style make the voice livelier and warmer; the defaults sound formal and flat. */
+private fun friendlyVoiceSettings() = JSONObject().put("stability", 0.35).put("similarity_boost", 0.75).put("style", 0.4).put("use_speaker_boost", true)
+
+/** Eleven v3 reads an audio tag as a direction for the voice instead of speaking it. */
+private const val FRIENDLY_TAG = "[warmly] "
+
 internal fun elevenLabsRequestBody(text: String, languageCode: String? = null): String =
     if (needsV3(languageCode)) {
-        JSONObject().put("text", text).put("model_id", MODEL_ID_V3).put("language_code", languageCode!!.lowercase()).toString()
+        JSONObject().put("text", FRIENDLY_TAG + text).put("model_id", MODEL_ID_V3).put("language_code", languageCode!!.lowercase()).toString()
     } else {
-        JSONObject().put("text", text).put("model_id", MODEL_ID).toString()
+        JSONObject().put("text", text).put("model_id", MODEL_ID).put("voice_settings", friendlyVoiceSettings()).toString()
     }
 
 internal fun elevenLabsUrl(voiceId: String) =

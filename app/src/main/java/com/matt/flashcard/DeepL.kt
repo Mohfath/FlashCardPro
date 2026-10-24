@@ -49,12 +49,17 @@ internal fun deepLErrorMessage(code: Int) = when (code) {
     else -> "DeepL error ($code)"
 }
 
-class DeepLClient(private val apiKey: () -> String) {
+class DeepLClient(private val apiKey: () -> String, private val colloquial: PersianColloquializer? = null) {
     suspend fun translate(text: String, from: String, to: String, formality: Formality = Formality.AUTO): String =
         translateMany(listOf(text), from, to, formality).single()
 
-    /** Translates several texts in one request; the result has the same order and size as [texts]. */
-    suspend fun translateMany(texts: List<String>, from: String, to: String, formality: Formality = Formality.AUTO): List<String> =
+    /** Translates several texts in one request; the result has the same order and size as [texts]. Persian is then made colloquial. */
+    suspend fun translateMany(texts: List<String>, from: String, to: String, formality: Formality = Formality.AUTO): List<String> {
+        val translated = requestTranslations(texts, from, to, formality)
+        return if (to == "fa" && colloquial != null) colloquial.rewrite(texts, translated) else translated
+    }
+
+    private suspend fun requestTranslations(texts: List<String>, from: String, to: String, formality: Formality): List<String> =
         withContext(Dispatchers.IO) {
             val key = apiKey()
             if (key.isBlank()) throw TranslationException("No DeepL key: add it in Settings")

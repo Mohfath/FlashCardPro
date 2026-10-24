@@ -411,8 +411,8 @@ private fun NewDeckDialog(onDismiss: () -> Unit, onCreate: (String, String, Stri
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(name, { name = it }, label = { Text("Deck name") }, singleLine = true)
-                LanguagePicker("My language", source, { source = it })
                 LanguagePicker("Language to Learn", target, { target = it })
+                LanguagePicker("My language", source, { source = it })
                 if (needsLatin) ReadingModePicker(mode, { mode = it })
                 if (supportsFormality(target)) TonePicker(tone, { tone = it })
             }

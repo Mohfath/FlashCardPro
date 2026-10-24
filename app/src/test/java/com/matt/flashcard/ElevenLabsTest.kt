@@ -18,6 +18,11 @@ class ElevenLabsTest {
         assertEquals("fa", body.getString("language_code"))
     }
 
+    @Test fun voiceIsAskedToBeFriendly() {
+        assertTrue(JSONObject(elevenLabsRequestBody("Dobro jutro")).getJSONObject("voice_settings").getDouble("stability") < 0.5)
+        assertTrue(JSONObject(elevenLabsRequestBody("salam", "fa")).getString("text").startsWith("[warmly] salam"))
+    }
+
     @Test fun languagesV2KnowsKeepV2AndSendNoTag() {
         val body = JSONObject(elevenLabsRequestBody("Dobro jutro", "hr"))
         assertEquals("eleven_multilingual_v2", body.getString("model_id"))

@@ -47,7 +47,7 @@ class AddCardViewModel(app: Application) : AndroidViewModel(app) {
     private val dao = AppDatabase.get(app).dao()
     private val audio = AudioStore(app)
     private val settings = AppSettings(app)
-    private val deepL = DeepLClient { settings.deepLKey() }
+    private val deepL = DeepLClient({ settings.deepLKey() }, PersianColloquializer(settings))
     private val elevenLabs = ElevenLabsClient({ settings.elevenLabsKey() })
     private val romanizer = Romanizer(settings)
     private var deck: Deck? = null

@@ -1,6 +1,7 @@
 package com.matt.flashcard
 
 import android.app.Application
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
@@ -28,17 +29,22 @@ private const val ENGLISH = "en"
 class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     private val dao = AppDatabase.get(app).dao()
     private val settings = AppSettings(app)
-    private val deepL = DeepLClient { settings.deepLKey() }
+    private val deepL = DeepLClient({ settings.deepLKey() }, PersianColloquializer(settings))
     private val romanizer = Romanizer(settings)
     private var deck: Deck? = null
     private var job: Job? = null
     private var idsJob: Job? = null
+    private var screenOpen = false
 
     private val _ui = MutableStateFlow<LibraryUi?>(null)
     val ui: StateFlow<LibraryUi?> = _ui
 
     fun open(deckId: Long) {
-        if (deck?.id == deckId) return
+        screenOpen = true
+        if (deck?.id == deckId) {
+            observeAddedIds(deckId)
+            return
+        }
         viewModelScope.launch {
             val d = dao.deck(deckId) ?: return@launch
             deck = d
@@ -49,14 +55,23 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
                 sourceFlag = languageFor(d.sourceLanguage)?.flag.orEmpty(),
                 targetFlag = languageFor(d.targetLanguage)?.flag.orEmpty(),
             )
-            idsJob?.cancel()
-            idsJob = launch { dao.libraryIdsIn(deckId).collect { ids -> update { copy(addedIds = ids.toSet()) } } }
+            observeAddedIds(deckId)
         }
     }
 
-    fun close() {
-        job?.cancel()
+    private fun observeAddedIds(deckId: Long) {
         idsJob?.cancel()
+        idsJob = viewModelScope.launch { dao.libraryIdsIn(deckId).collect { ids -> update { copy(addedIds = ids.toSet()) } } }
+    }
+
+    /** Leaving the Library does not stop a copy in progress: it finishes in the background and the screen picks it up when reopened. */
+    fun close() {
+        screenOpen = false
+        idsJob?.cancel()
+        if (job?.isActive != true) reset()
+    }
+
+    private fun reset() {
         deck = null
         _ui.value = null
     }
@@ -70,7 +85,7 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
         if (current.copyingCategoryId != null) return
         val missing = missingEntries(category, current.addedIds)
         if (missing.isEmpty()) return
-        update { copy(copyingCategoryId = category.id, note = null, noteIsError = false) }
+        updateFor(d.id) { copy(copyingCategoryId = category.id, note = null, noteIsError = false) }
         job = viewModelScope.launch {
             try {
                 val english = missing.map { it.english }
@@ -88,7 +103,7 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
                     Card(deckId = d.id, sourceText = sources[i], targetText = targets[i], romanization = reading, libraryId = missing[i].libraryId)
                 }
                 dao.insertCards(cards)
-                update {
+                updateFor(d.id) {
                     copy(
                         note = "Added ${cards.size} card${if (cards.size == 1) "" else "s"}" +
                             if (withoutLatin > 0) ". $withoutLatin without Latin letters, check your AI key in Settings." else ".",
@@ -96,11 +111,16 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
                     )
                 }
             } catch (e: TranslationException) {
-                update { copy(note = e.message, noteIsError = true) }
+                updateFor(d.id) { copy(note = e.message, noteIsError = true) }
             } catch (e: CancellationException) {
                 throw e
             } finally {
-                update { copy(copyingCategoryId = null) }
+                updateFor(d.id) { copy(copyingCategoryId = null) }
+                if (!screenOpen && deck?.id == d.id) {
+                    val note = _ui.value?.note
+                    reset()
+                    note?.let { Toast.makeText(getApplication(), it, Toast.LENGTH_LONG).show() }
+                }
             }
         }
     }
@@ -111,5 +131,10 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun update(block: LibraryUi.() -> LibraryUi) {
         _ui.value = _ui.value?.block()
+    }
+
+    /** For the copy job, which may outlive the screen: changes the state only while it still belongs to the Deck being copied. */
+    private fun updateFor(deckId: Long, block: LibraryUi.() -> LibraryUi) {
+        if (deck?.id == deckId) update(block)
     }
 }
