@@ -28,8 +28,6 @@ data class ReviewUi(
     val answerRomanization: String? = null,
     /** Show only the Latin letters, not the native script. */
     val hideNative: Boolean = false,
-    val redoingAudio: Boolean = false,
-    val audioError: String? = null,
     /** Flag emoji of the Prompt / Answer language, for the car screen. */
     val promptFlag: String = "",
     val answerFlag: String = "",
@@ -39,9 +37,6 @@ class ReviewViewModel(app: Application) : AndroidViewModel(app) {
     private val dao = AppDatabase.get(app).dao()
     private val audio = AudioStore(app)
     private val player = AudioPlayer(app, audio)
-    private val elevenLabs = ElevenLabsClient({ AppSettings(app).elevenLabsKey() })
-    private var redoingAudio = false
-    private var audioError: String? = null
     private var session: ReviewSession? = null
     private var deck: Deck? = null
 
@@ -74,33 +69,6 @@ class ReviewViewModel(app: Application) : AndroidViewModel(app) {
     fun answer(verdict: Verdict) = act { persist(answer(verdict)) }
     fun delete() = act { persist(delete()) }
 
-    /** Makes the audio of the Card on screen again, e.g. after a voice or model change; the old file is deleted. */
-    fun redoAudio() {
-        val d = deck ?: return
-        val s = session ?: return
-        val card = s.current ?: return
-        if (redoingAudio) return
-        redoingAudio = true
-        audioError = null
-        publish()
-        viewModelScope.launch {
-            try {
-                val name = audio.save(elevenLabs.synthesize(card.targetText, d.targetLanguage))
-                val updated = card.copy(targetAudioPath = name)
-                dao.updateCard(updated)
-                audio.delete(card.targetAudioPath)
-                s.refreshCurrent(updated)
-                redoingAudio = false
-                publish()
-                play(name)
-            } catch (e: AudioException) {
-                audioError = e.message
-                redoingAudio = false
-                publish()
-            }
-        }
-    }
-
     private fun act(block: ReviewSession.() -> Unit) {
         session?.block()
         publish()
@@ -123,7 +91,7 @@ class ReviewViewModel(app: Application) : AndroidViewModel(app) {
     private fun publish() {
         val s = session ?: return
         val d = deck ?: return
-        _ui.value = buildReviewUi(d, s).copy(redoingAudio = redoingAudio, audioError = audioError)
+        _ui.value = buildReviewUi(d, s)
     }
 }
 

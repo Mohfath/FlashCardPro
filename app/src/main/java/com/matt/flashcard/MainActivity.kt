@@ -72,7 +72,6 @@ class MainActivity : ComponentActivity() {
                         onReveal = review::reveal,
                         onAnswer = review::answer,
                         onDelete = review::delete,
-                        onRedoAudio = review::redoAudio,
                     )
                     libraryDeckId != null -> LibraryScreen(
                         ui = library.ui.collectAsState().value,

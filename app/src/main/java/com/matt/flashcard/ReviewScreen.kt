@@ -68,11 +68,13 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.sp
 import kotlin.math.abs
 
 @Composable
-fun ReviewScreen(ui: ReviewUi?, onBack: () -> Unit, onPlay: (String) -> Unit, onReveal: () -> Unit, onAnswer: (Verdict) -> Unit, onDelete: () -> Unit, onRedoAudio: () -> Unit = {}) {
+fun ReviewScreen(ui: ReviewUi?, onBack: () -> Unit, onPlay: (String) -> Unit, onReveal: () -> Unit, onAnswer: (Verdict) -> Unit, onDelete: () -> Unit) {
     val c = LocalFlashColors.current
     Box(Modifier.fillMaxSize().background(c.canvas).safeDrawingPadding()) {
         when {
@@ -110,7 +112,7 @@ fun ReviewScreen(ui: ReviewUi?, onBack: () -> Unit, onPlay: (String) -> Unit, on
                         },
                     )
                     Spacer(Modifier.height(16.dp))
-                    Dock(ui, onReveal, answerAnimated, onDelete, onRedoAudio)
+                    Dock(ui, onReveal, answerAnimated, onDelete)
                     Spacer(Modifier.height(16.dp))
                 }
             }
@@ -360,34 +362,35 @@ private fun CardText(
 }
 
 @Composable
-private fun Dock(ui: ReviewUi, onReveal: () -> Unit, onAnswer: (Verdict) -> Unit, onDelete: () -> Unit, onRedoAudio: () -> Unit) {
+private fun Dock(ui: ReviewUi, onReveal: () -> Unit, onAnswer: (Verdict) -> Unit, onDelete: () -> Unit) {
     val c = LocalFlashColors.current
+    if (ui.pendingDelete) {
+        Text("Tap the bin again to delete this card", style = FlashType.labelMd, color = c.danger, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(6.dp))
+    }
     if (!ui.revealed) {
         DockButton("Reveal", c.accent, c.onAccent, Modifier.fillMaxWidth(), onReveal)
+        Spacer(Modifier.height(10.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+            IconAction("🗑️", "Delete card", 48, if (ui.pendingDelete) c.danger.copy(alpha = 0.18f) else c.inset, onDelete)
+        }
     } else {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            DockButton("Didn't know", c.inset, c.ink, Modifier.weight(1f)) { onAnswer(Verdict.DIDNT_KNOW) }
-            DockButton("Know", c.accent, c.onAccent, Modifier.weight(1f)) { onAnswer(Verdict.KNOW) }
+        // Left: didn't know. Centre: delete. Right: know. Swiping the card left or right does the same as the outer two.
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            IconAction("🤷", "Didn't know", 68, c.inset) { onAnswer(Verdict.DIDNT_KNOW) }
+            IconAction("🗑️", "Delete card", 52, if (ui.pendingDelete) c.danger.copy(alpha = 0.18f) else c.inset, onDelete)
+            IconAction("👍", "Know", 68, c.accent) { onAnswer(Verdict.KNOW) }
         }
     }
-    if (ui.audioError != null) {
-        Spacer(Modifier.height(6.dp))
-        Text(ui.audioError, style = FlashType.labelMd, color = c.danger, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-    }
-    Spacer(Modifier.height(8.dp))
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-        Text(
-            if (ui.redoingAudio) "Making audio…" else "Redo audio",
-            style = FlashType.labelLg, color = c.inkSecondary, textAlign = TextAlign.Center,
-            modifier = Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).clickable(enabled = !ui.redoingAudio, onClick = onRedoAudio)
-                .padding(vertical = 12.dp),
-        )
-        Text(
-            if (ui.pendingDelete) "Press again to delete" else "Delete",
-            style = FlashType.labelLg, color = c.danger, textAlign = TextAlign.Center,
-            modifier = Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).clickable(onClick = onDelete).padding(vertical = 12.dp),
-        )
-    }
+}
+
+/** A round button with one emoji on it. */
+@Composable
+private fun IconAction(emoji: String, description: String, sizeDp: Int, bg: androidx.compose.ui.graphics.Color, onClick: () -> Unit) {
+    Box(
+        Modifier.size(sizeDp.dp).clip(CircleShape).background(bg).semantics { contentDescription = description }.clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Text(emoji, fontSize = (sizeDp * 0.45f).sp) }
 }
 
 @Composable
