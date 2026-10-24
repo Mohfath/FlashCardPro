@@ -67,16 +67,9 @@ fun DeckListScreen(decks: List<DeckSummary>?, week: List<DayCount>, selectedId: 
 
     Box(Modifier.fillMaxSize().background(c.canvas).safeDrawingPadding()) {
         Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-            Spacer(Modifier.height(24.dp))
-            Text("Decks", style = FlashType.headlineLg, color = c.ink)
-            if (!decks.isNullOrEmpty()) {
-                val due = decks.sumOf { it.due }
-                Text(
-                    "${decks.size} Deck${if (decks.size == 1) "" else "s"} · $due Due Cards today",
-                    style = FlashType.labelLg, color = c.accent,
-                )
-            }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
+            Text("Flashcards", style = FlashType.headlineLg, color = c.ink)
+            Spacer(Modifier.height(10.dp))
             when {
                 decks == null -> Unit
                 decks.isEmpty() -> EmptyState(Modifier.weight(1f))

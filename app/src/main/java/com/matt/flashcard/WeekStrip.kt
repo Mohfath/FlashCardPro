@@ -21,21 +21,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** The last seven days: a filled circle with the number of Cards practiced, or an ice cube when the day was skipped. */
+/** The last seven days, with no heading so the circles take the whole card: a filled circle with the number of Cards practiced, or an ice cube when the day was skipped. */
 @Composable
 fun WeekStrip(week: List<DayCount>, modifier: Modifier = Modifier) {
     val c = LocalFlashColors.current
     val shape = RoundedCornerShape(24.dp)
-    val total = week.sumOf { it.count }
-    Column(modifier.fillMaxWidth().clip(shape).background(c.surface).border(1.dp, c.divider, shape).padding(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("LAST 7 DAYS", style = FlashType.labelMd, color = c.inkSecondary, modifier = Modifier.weight(1f))
-            Text(
-                if (total == 0) "No practice yet" else "$total card${if (total == 1) "" else "s"}",
-                style = FlashType.labelMd, color = if (total == 0) c.inkSecondary else c.accent,
-            )
-        }
-        Spacer(Modifier.height(12.dp))
+    Column(modifier.fillMaxWidth().clip(shape).background(c.surface).border(1.dp, c.divider, shape).padding(horizontal = 16.dp, vertical = 12.dp)) {
         Row(Modifier.fillMaxWidth()) {
             week.forEach { DayCircle(it, Modifier.weight(1f)) }
         }
