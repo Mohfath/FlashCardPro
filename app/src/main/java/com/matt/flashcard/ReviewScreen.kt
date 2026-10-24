@@ -1,9 +1,14 @@
 package com.matt.flashcard
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -268,18 +273,25 @@ private fun CardFace(ui: ReviewUi, onPlay: (String) -> Unit, onReveal: () -> Uni
                     SideLabel("PROMPT · ${ui.promptLanguage}")
                     Spacer(Modifier.height(12.dp))
                     CardText(ui.promptText, c.ink, ui.promptAudio, onPlay, ui.promptRomanization, ui.hideNative)
-                    if (ui.revealed) {
-                        Spacer(Modifier.height(24.dp))
-                        Box(Modifier.fillMaxWidth(0.4f).height(1.dp).background(c.divider))
-                        Spacer(Modifier.height(24.dp))
-                        SideLabel("ANSWER · ${ui.answerLanguage}")
-                        Spacer(Modifier.height(12.dp))
-                        CardText(ui.answerText, c.accent, ui.answerAudio, onPlay, ui.answerRomanization, ui.hideNative)
-                        if (!ui.example.isNullOrBlank()) {
+                    // The Answer eases in. No exit animation: on the next Card the old Answer must vanish at once, not fade over the new Prompt.
+                    AnimatedVisibility(
+                        visible = ui.revealed,
+                        enter = fadeIn(tween(350)) + expandVertically(tween(350)) + slideInVertically(tween(350)) { it / 6 },
+                        exit = ExitTransition.None,
+                    ) {
+                        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                             Spacer(Modifier.height(24.dp))
-                            SideLabel("EXAMPLE")
-                            Spacer(Modifier.height(8.dp))
-                            Text(ui.example, style = FlashType.bodyMd, color = c.inkSecondary, textAlign = TextAlign.Center)
+                            Box(Modifier.fillMaxWidth(0.4f).height(1.dp).background(c.divider))
+                            Spacer(Modifier.height(24.dp))
+                            SideLabel("ANSWER · ${ui.answerLanguage}")
+                            Spacer(Modifier.height(12.dp))
+                            CardText(ui.answerText, c.accent, ui.answerAudio, onPlay, ui.answerRomanization, ui.hideNative)
+                            if (!ui.example.isNullOrBlank()) {
+                                Spacer(Modifier.height(24.dp))
+                                SideLabel("EXAMPLE")
+                                Spacer(Modifier.height(8.dp))
+                                Text(ui.example, style = FlashType.bodyMd, color = c.inkSecondary, textAlign = TextAlign.Center)
+                            }
                         }
                     }
                 }
