@@ -154,9 +154,9 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
             return if (firstIsTarget) line.second to line.first else line.first to line.second
         }
         return if (firstIsTarget) {
-            deepL.translate(line.first, d.targetLanguage, d.sourceLanguage) to line.first
+            deepL.translate(line.first, d.targetLanguage, d.sourceLanguage, d.formality) to line.first
         } else {
-            line.first to deepL.translate(line.first, d.sourceLanguage, d.targetLanguage)
+            line.first to deepL.translate(line.first, d.sourceLanguage, d.targetLanguage, d.formality)
         }
     }
 

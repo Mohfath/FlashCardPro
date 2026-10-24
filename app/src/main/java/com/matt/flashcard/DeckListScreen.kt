@@ -56,13 +56,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun DeckListScreen(decks: List<DeckSummary>?, week: List<DayCount>, selectedId: Long, onSelect: (Long) -> Unit, onOpen: (Long) -> Unit, onAddCard: (Long) -> Unit, onCreate: (String, String, String, ReadingMode) -> Unit, onDeleteDeck: (Deck) -> Unit,
-    backfill: Backfill?, onSetReading: (Deck, ReadingMode, Boolean) -> Unit, onDismissBackfill: () -> Unit,
+fun DeckListScreen(decks: List<DeckSummary>?, week: List<DayCount>, selectedId: Long, onSelect: (Long) -> Unit, onOpen: (Long) -> Unit, onAddCard: (Long) -> Unit, onCreate: (String, String, String, ReadingMode, Formality) -> Unit, onDeleteDeck: (Deck) -> Unit,
+    backfill: Backfill?, onSetReading: (Deck, ReadingMode, Boolean) -> Unit, onSetFormality: (Deck, Formality) -> Unit, onDismissBackfill: () -> Unit,
 ) {
     val c = LocalFlashColors.current
     var creating by rememberSaveable { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<DeckSummary?>(null) }
     var choosingReading by remember { mutableStateOf<DeckSummary?>(null) }
+    var choosingTone by remember { mutableStateOf<DeckSummary?>(null) }
 
     Box(Modifier.fillMaxSize().background(c.canvas).safeDrawingPadding()) {
         Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
@@ -88,7 +89,7 @@ fun DeckListScreen(decks: List<DeckSummary>?, week: List<DayCount>, selectedId: 
                     Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                         DeckCard(active, onClick = { onOpen(active.deck.id) }, onAddCard = { onAddCard(active.deck.id) }, onDelete = { deleting = active },
                             backfill = backfill?.takeIf { it.deckId == active.deck.id }, onDismissBackfill = onDismissBackfill,
-                            onLatin = { choosingReading = active },
+                            onLatin = { choosingReading = active }, onTone = { choosingTone = active },
                         )
                     }
                 }
@@ -97,6 +98,33 @@ fun DeckListScreen(decks: List<DeckSummary>?, week: List<DayCount>, selectedId: 
             DockButton("+  New Deck", c.accent, c.onAccent, Modifier.fillMaxWidth()) { creating = true }
             Spacer(Modifier.height(16.dp))
         }
+    }
+
+    choosingTone?.let { s ->
+        var tone by remember(s.deck.id) { mutableStateOf(s.deck.formality) }
+        AlertDialog(
+            modifier = Modifier.padding(horizontal = 28.dp),
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+            onDismissRequest = { choosingTone = null },
+            title = { Text("Tone of translations") },
+            text = {
+                Column {
+                    Formality.entries.forEach { option ->
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { tone = option }.padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = tone == option, onClick = { tone = option })
+                            Text(option.label, style = FlashType.bodyMd, color = c.ink)
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text("Applies to new translations. Cards you already have stay as they are.", style = FlashType.labelMd, color = c.inkSecondary)
+                }
+            },
+            confirmButton = { TextButton(onClick = { onSetFormality(s.deck, tone); choosingTone = null }) { Text("Apply") } },
+            dismissButton = { TextButton(onClick = { choosingTone = null }) { Text("Cancel") } },
+        )
     }
 
     choosingReading?.let { s ->
@@ -156,7 +184,7 @@ fun DeckListScreen(decks: List<DeckSummary>?, week: List<DayCount>, selectedId: 
         )
     }
 
-    if (creating) NewDeckDialog(onDismiss = { creating = false }, onCreate = { n, s, t, m -> onCreate(n, s, t, m); creating = false })
+    if (creating) NewDeckDialog(onDismiss = { creating = false }, onCreate = { n, s, t, m, f -> onCreate(n, s, t, m, f); creating = false })
 }
 
 @Composable
@@ -207,7 +235,7 @@ private fun EmptyState(modifier: Modifier) {
 @Composable
 private fun DeckCard(
     s: DeckSummary, onClick: () -> Unit, onAddCard: () -> Unit, onDelete: () -> Unit,
-    backfill: Backfill?, onDismissBackfill: () -> Unit, onLatin: () -> Unit,
+    backfill: Backfill?, onDismissBackfill: () -> Unit, onLatin: () -> Unit, onTone: () -> Unit,
 ) {
     val c = LocalFlashColors.current
     val canReview = s.total > 0
@@ -249,6 +277,13 @@ private fun DeckCard(
                 "Show: ${s.deck.readingMode.label} · change",
                 style = FlashType.labelLg, color = c.inkSecondary,
                 modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onLatin).padding(vertical = 10.dp, horizontal = 4.dp),
+            )
+        }
+        if (supportsFormality(s.deck.targetLanguage)) {
+            Text(
+                "Tone: ${s.deck.formality.label} · change",
+                style = FlashType.labelLg, color = c.inkSecondary,
+                modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onTone).padding(vertical = 10.dp, horizontal = 4.dp),
             )
         }
         if (backfill != null) {
@@ -327,11 +362,12 @@ private fun BoxBar(counts: List<Int>) {
 }
 
 @Composable
-private fun NewDeckDialog(onDismiss: () -> Unit, onCreate: (String, String, String, ReadingMode) -> Unit) {
+private fun NewDeckDialog(onDismiss: () -> Unit, onCreate: (String, String, String, ReadingMode, Formality) -> Unit) {
     var name by rememberSaveable { mutableStateOf("") }
     var source by rememberSaveable { mutableStateOf("en") }
     var target by rememberSaveable { mutableStateOf("hr") }
     var mode by rememberSaveable { mutableStateOf(ReadingMode.SCRIPT) }
+    var tone by rememberSaveable { mutableStateOf(Formality.INFORMAL) }
     val needsLatin = languageFor(target)?.latin == false
     AlertDialog(
         modifier = Modifier.padding(horizontal = 28.dp),
@@ -344,10 +380,11 @@ private fun NewDeckDialog(onDismiss: () -> Unit, onCreate: (String, String, Stri
                 LanguagePicker("My language", source, { source = it })
                 LanguagePicker("Language to Learn", target, { target = it })
                 if (needsLatin) ReadingModePicker(mode, { mode = it })
+                if (supportsFormality(target)) TonePicker(tone, { tone = it })
             }
         },
         confirmButton = {
-            TextButton(onClick = { onCreate(name, source, target, if (needsLatin) mode else ReadingMode.SCRIPT) }, enabled = name.isNotBlank() && source != target) { Text("Create") }
+            TextButton(onClick = { onCreate(name, source, target, if (needsLatin) mode else ReadingMode.SCRIPT, if (supportsFormality(target)) tone else Formality.INFORMAL) }, enabled = name.isNotBlank() && source != target) { Text("Create") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
@@ -372,6 +409,32 @@ private fun LanguagePicker(label: String, selected: String, onSelect: (String) -
             DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = c.surface, shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, c.divider)) {
                 Languages.forEach { lang ->
                     DropdownMenuItem(text = { LanguageLabel(lang) }, onClick = { onSelect(lang.code); open = false })
+                }
+            }
+        }
+    }
+}
+
+/** Dropdown for the tone DeepL uses when translating into the language being learned. */
+@Composable
+private fun TonePicker(selected: Formality, onSelect: (Formality) -> Unit) {
+    val c = LocalFlashColors.current
+    var open by remember { mutableStateOf(false) }
+    Column {
+        Text("Tone of translations", style = FlashType.labelMd, color = c.inkSecondary)
+        Spacer(Modifier.height(4.dp))
+        Box {
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(1.dp, c.divider, RoundedCornerShape(12.dp))
+                    .clickable { open = true }.padding(horizontal = 12.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(selected.label, style = FlashType.bodyMd, color = c.ink, modifier = Modifier.weight(1f))
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = c.inkSecondary)
+            }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = c.surface, shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, c.divider)) {
+                Formality.entries.forEach { option ->
+                    DropdownMenuItem(text = { Text(option.label, style = FlashType.bodyMd, color = c.ink) }, onClick = { onSelect(option); open = false })
                 }
             }
         }

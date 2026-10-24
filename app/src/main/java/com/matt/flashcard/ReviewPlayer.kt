@@ -151,11 +151,11 @@ class ReviewPlayer(context: Context) : SimpleBasePlayer(Looper.getMainLooper()) 
 
     private fun cardMetadata(ui: ReviewUi): MediaMetadata {
         val subtitle = when {
-            ui.revealed -> ui.answerText
+            ui.revealed -> ui.answerShown
             else -> "Press play to reveal"
         }
         return MediaMetadata.Builder()
-            .setTitle(ui.promptText)
+            .setTitle(ui.promptShown)
             .setSubtitle(subtitle)
             .setArtist(subtitle)
             .setAlbumTitle(ui.deckName)

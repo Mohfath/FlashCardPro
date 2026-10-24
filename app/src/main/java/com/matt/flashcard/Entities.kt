@@ -16,7 +16,13 @@ data class Deck(
     @ColumnInfo(defaultValue = "0") val romanize: Boolean = false,
     /** With [romanize] on: show only the Latin letters and hide the native script. */
     @ColumnInfo(defaultValue = "0") val latinOnly: Boolean = false,
+    /** Stored [Formality] ordinal: how DeepL words translations into the language being learned (0 = informal). */
+    @ColumnInfo(defaultValue = "0") val formalityCode: Int = 0,
 ) {
+    val formality: Formality get() = Formality.entries.getOrElse(formalityCode) { Formality.INFORMAL }
+
+    fun withFormality(f: Formality) = copy(formalityCode = f.ordinal)
+
     val readingMode: ReadingMode
         get() = when {
             !romanize -> ReadingMode.SCRIPT
@@ -25,6 +31,13 @@ data class Deck(
         }
 
     fun withReadingMode(mode: ReadingMode) = copy(romanize = mode != ReadingMode.SCRIPT, latinOnly = mode == ReadingMode.LATIN)
+}
+
+/** Tone of translations. [deepL] is DeepL's "prefer" value, which is ignored (not an error) for languages without the feature. */
+enum class Formality(val label: String, val deepL: String?) {
+    INFORMAL("Informal", "prefer_less"),
+    FORMAL("Formal", "prefer_more"),
+    AUTO("Automatic", null),
 }
 
 /** How a Deck shows the language being learned: the native script, Latin letters, or both. */

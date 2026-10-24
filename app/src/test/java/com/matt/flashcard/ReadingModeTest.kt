@@ -28,4 +28,11 @@ class ReadingModeTest {
         assertFalse(reviewUi(ReadingMode.SCRIPT).hideNative)
         assertFalse(reviewUi(ReadingMode.BOTH).hideNative)
     }
+
+    @Test fun carTextUsesLatinForLatinOnlyDecks() {
+        val ui = ReviewUi("d", 1, 1, "هستم", "PERSIAN", "I am", "ENGLISH", true, false, 1, false, promptRomanization = "hastam", hideNative = true)
+        assertEquals("hastam", ui.promptShown)
+        assertEquals("I am", ui.answerShown)
+        assertEquals("هستم", ui.copy(hideNative = false).promptShown)
+    }
 }

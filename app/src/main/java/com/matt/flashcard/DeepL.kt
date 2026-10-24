@@ -10,11 +10,12 @@ import org.json.JSONObject
 class TranslationException(message: String) : Exception(message)
 
 /** Turns "en"/"hr" style codes into DeepL's upper-case language codes. */
-internal fun deepLRequestBody(text: String, from: String, to: String): String =
+internal fun deepLRequestBody(text: String, from: String, to: String, formality: Formality = Formality.AUTO): String =
     JSONObject()
         .put("text", JSONArray().put(text))
         .put("source_lang", from.uppercase())
         .put("target_lang", deepLTarget(to))
+        .apply { formality.deepL?.let { put("formality", it) } }
         .toString()
 
 /** DeepL wants a regional variant for these as a target (not as a source). */
@@ -43,7 +44,7 @@ internal fun deepLErrorMessage(code: Int) = when (code) {
 }
 
 class DeepLClient(private val apiKey: () -> String) {
-    suspend fun translate(text: String, from: String, to: String): String = withContext(Dispatchers.IO) {
+    suspend fun translate(text: String, from: String, to: String, formality: Formality = Formality.AUTO): String = withContext(Dispatchers.IO) {
         val key = apiKey()
         if (key.isBlank()) throw TranslationException("No DeepL key: add it in Settings")
         val conn = URL(deepLEndpoint(key)).openConnection() as HttpURLConnection
@@ -54,7 +55,7 @@ class DeepLClient(private val apiKey: () -> String) {
             conn.doOutput = true
             conn.setRequestProperty("Authorization", "DeepL-Auth-Key $key")
             conn.setRequestProperty("Content-Type", "application/json")
-            conn.outputStream.use { it.write(deepLRequestBody(text, from, to).toByteArray()) }
+            conn.outputStream.use { it.write(deepLRequestBody(text, from, to, formality).toByteArray()) }
             if (conn.responseCode != 200) throw TranslationException(deepLErrorMessage(conn.responseCode))
             parseDeepLTranslation(conn.inputStream.bufferedReader().use { it.readText() })
         } catch (e: TranslationException) {

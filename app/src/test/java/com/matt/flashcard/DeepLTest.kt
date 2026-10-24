@@ -33,4 +33,24 @@ class DeepLTest {
         assertEquals("DeepL rejected the API key", deepLErrorMessage(403))
         assertEquals("DeepL error (500)", deepLErrorMessage(500))
     }
+
+    @Test fun informalAndFormalAreSentAsPreferences() {
+        assertEquals("prefer_less", JSONObject(deepLRequestBody("Hi", "en", "de", Formality.INFORMAL)).getString("formality"))
+        assertEquals("prefer_more", JSONObject(deepLRequestBody("Hi", "en", "de", Formality.FORMAL)).getString("formality"))
+    }
+
+    @Test fun automaticSendsNoFormality() {
+        assertTrue(!JSONObject(deepLRequestBody("Hi", "en", "de", Formality.AUTO)).has("formality"))
+        assertTrue(!JSONObject(deepLRequestBody("Hi", "en", "de")).has("formality"))
+    }
+
+    @Test fun formalityIsOfferedOnlyWhereDeepLSupportsIt() {
+        assertTrue(supportsFormality("de") && supportsFormality("ja"))
+        assertTrue(!supportsFormality("hr") && !supportsFormality("fa") && !supportsFormality("en"))
+    }
+
+    @Test fun deckDefaultsToInformalAndRoundTrips() {
+        assertEquals(Formality.INFORMAL, Deck(name = "a").formality)
+        Formality.entries.forEach { assertEquals(it, Deck(name = "a").withFormality(it).formality) }
+    }
 }

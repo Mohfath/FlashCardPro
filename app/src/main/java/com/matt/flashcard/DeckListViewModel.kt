@@ -91,11 +91,15 @@ class DeckListViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun createDeck(name: String, sourceLanguage: String, targetLanguage: String, readingMode: ReadingMode) {
+    fun setFormality(deck: Deck, formality: Formality) {
+        viewModelScope.launch { dao.updateDeck(deck.withFormality(formality)) }
+    }
+
+    fun createDeck(name: String, sourceLanguage: String, targetLanguage: String, readingMode: ReadingMode, formality: Formality) {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
         viewModelScope.launch {
-            select(dao.insertDeck(Deck(name = trimmed, sourceLanguage = sourceLanguage, targetLanguage = targetLanguage).withReadingMode(readingMode)))
+            select(dao.insertDeck(Deck(name = trimmed, sourceLanguage = sourceLanguage, targetLanguage = targetLanguage).withReadingMode(readingMode).withFormality(formality)))
         }
     }
 }

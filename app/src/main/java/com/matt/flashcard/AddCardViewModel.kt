@@ -145,7 +145,7 @@ class AddCardViewModel(app: Application) : AndroidViewModel(app) {
             val from = if (typedIn == Side.SOURCE) d.sourceLanguage else d.targetLanguage
             val to = if (typedIn == Side.SOURCE) d.targetLanguage else d.sourceLanguage
             try {
-                val result = deepL.translate(text.trim(), from, to).take(MAX_SOURCE_CHARS)
+                val result = deepL.translate(text.trim(), from, to, d.formality).take(MAX_SOURCE_CHARS)
                 update { if (into == Side.TARGET) copy(target = result, translatingInto = null) else copy(source = result, translatingInto = null) }
                 if (into == Side.TARGET) romanizeAfter(0)
             } catch (e: TranslationException) {

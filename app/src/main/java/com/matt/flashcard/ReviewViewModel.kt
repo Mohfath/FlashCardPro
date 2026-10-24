@@ -159,3 +159,7 @@ private fun languageLabel(code: String) = when (code) {
     "hr" -> "HRVATSKI"
     else -> languageName(code)
 }
+
+/** The Prompt / Answer text as the deck wants it shown: the Latin reading instead of the script for Latin-only decks. */
+internal val ReviewUi.promptShown: String get() = promptRomanization?.takeIf { hideNative } ?: promptText
+internal val ReviewUi.answerShown: String get() = answerRomanization?.takeIf { hideNative } ?: answerText

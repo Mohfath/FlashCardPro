@@ -97,6 +97,7 @@ class MainActivity : ComponentActivity() {
                         onDeleteDeck = deckList::deleteDeck,
                         backfill = deckList.backfill.collectAsState().value,
                         onSetReading = deckList::setReadingMode,
+                        onSetFormality = deckList::setFormality,
                         onDismissBackfill = deckList::dismissBackfill,
                     )
                 }

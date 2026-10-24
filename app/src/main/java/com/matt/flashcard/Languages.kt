@@ -36,6 +36,11 @@ val Languages = listOf(
     Language("da", "Danish", "DK"),
 ).sortedBy { it.name }
 
+/** Languages DeepL can address formally or informally when they are the translation target. */
+private val FormalityLanguages = setOf("de", "fr", "it", "es", "nl", "pl", "pt", "ru", "ja")
+
+fun supportsFormality(code: String) = code in FormalityLanguages
+
 fun languageFor(code: String): Language? = Languages.firstOrNull { it.code == code }
 
 internal fun languageName(code: String) = languageFor(code)?.name?.uppercase() ?: code.uppercase()
