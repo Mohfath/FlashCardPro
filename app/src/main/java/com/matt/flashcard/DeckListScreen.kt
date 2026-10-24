@@ -256,7 +256,8 @@ private fun DeckCard(
     Column(
         Modifier.fillMaxWidth()
             .shadow(10.dp, shape, ambientColor = c.accent.copy(alpha = 0.18f), spotColor = c.accent.copy(alpha = 0.18f))
-            .clip(shape).background(c.surface).border(1.dp, c.divider, shape).padding(20.dp),
+            .clip(shape).background(c.surface).border(1.dp, c.divider, shape)
+            .clickable(enabled = s.total > 0, onClick = onOpen).padding(20.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             LanguageBadge(s.deck)
