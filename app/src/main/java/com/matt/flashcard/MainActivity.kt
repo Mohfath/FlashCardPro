@@ -69,6 +69,7 @@ class MainActivity : ComponentActivity() {
                         ui = review.ui.collectAsState().value,
                         onBack = { reviewDeckId = null },
                         onPlay = review::play,
+                        onMakeAudio = review::makeAudio,
                         onReveal = review::reveal,
                         onAnswer = review::answer,
                         onDelete = review::delete,

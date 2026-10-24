@@ -74,7 +74,7 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.abs
 
 @Composable
-fun ReviewScreen(ui: ReviewUi?, onBack: () -> Unit, onPlay: (String) -> Unit, onReveal: () -> Unit, onAnswer: (Verdict) -> Unit, onDelete: () -> Unit) {
+fun ReviewScreen(ui: ReviewUi?, onBack: () -> Unit, onPlay: (String) -> Unit, onMakeAudio: () -> Unit, onReveal: () -> Unit, onAnswer: (Verdict) -> Unit, onDelete: () -> Unit) {
     val c = LocalFlashColors.current
     Box(Modifier.fillMaxSize().background(c.canvas).safeDrawingPadding()) {
         when {
@@ -96,12 +96,13 @@ fun ReviewScreen(ui: ReviewUi?, onBack: () -> Unit, onPlay: (String) -> Unit, on
                         .padding(horizontal = 20.dp),
                 ) {
                     // The target-language side speaks as soon as it appears.
-                    LaunchedEffect(ui.cardId, ui.promptAudio) { ui.promptAudio?.let(onPlay) }
-                    LaunchedEffect(ui.cardId, ui.revealed) { if (ui.revealed) ui.answerAudio?.let(onPlay) }
+                    // A target-language side is read aloud as soon as it appears; if the Card has no audio yet it is made first.
+                    LaunchedEffect(ui.cardId) { if (ui.promptIsTarget) ui.promptAudio?.let(onPlay) ?: onMakeAudio() }
+                    LaunchedEffect(ui.cardId, ui.revealed) { if (ui.revealed && ui.answerIsTarget) ui.answerAudio?.let(onPlay) ?: onMakeAudio() }
                     CompactHeader(ui, onBack)
                     Spacer(Modifier.height(8.dp))
                     CardFace(
-                        ui, onPlay, onReveal, scroll, swipe,
+                        ui, onPlay, onMakeAudio, onReveal, scroll, swipe,
                         Modifier.weight(1f).graphicsLayer {
                             translationX = swipe.x
                             translationY = swipe.y
@@ -246,7 +247,7 @@ private fun CompactHeader(ui: ReviewUi, onBack: () -> Unit) {
 }
 
 @Composable
-private fun CardFace(ui: ReviewUi, onPlay: (String) -> Unit, onReveal: () -> Unit, scroll: ScrollState, swipe: CardSwipe, modifier: Modifier) {
+private fun CardFace(ui: ReviewUi, onPlay: (String) -> Unit, onMakeAudio: () -> Unit, onReveal: () -> Unit, scroll: ScrollState, swipe: CardSwipe, modifier: Modifier) {
     val c = LocalFlashColors.current
     val shape = RoundedCornerShape(28.dp)
     Column(
@@ -272,7 +273,7 @@ private fun CardFace(ui: ReviewUi, onPlay: (String) -> Unit, onReveal: () -> Uni
                     Modifier.fillMaxWidth().heightIn(min = minHeight).padding(horizontal = 28.dp, vertical = 24.dp),
                     verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    CardText(ui.promptText, c.ink, ui.promptAudio, onPlay, ui.promptRomanization, ui.hideNative)
+                    CardText(ui.promptText, c.ink, ui.promptAudio, onPlay, ui.promptRomanization, ui.hideNative, ui.promptIsTarget, ui.makingAudio, onMakeAudio)
                     // The Answer eases in. No exit animation: on the next Card the old Answer must vanish at once, not fade over the new Prompt.
                     AnimatedVisibility(
                         visible = ui.revealed,
@@ -283,7 +284,7 @@ private fun CardFace(ui: ReviewUi, onPlay: (String) -> Unit, onReveal: () -> Uni
                             Spacer(Modifier.height(24.dp))
                             Box(Modifier.fillMaxWidth(0.4f).height(1.dp).background(c.divider))
                             Spacer(Modifier.height(24.dp))
-                            CardText(ui.answerText, c.accent, ui.answerAudio, onPlay, ui.answerRomanization, ui.hideNative)
+                            CardText(ui.answerText, c.accent, ui.answerAudio, onPlay, ui.answerRomanization, ui.hideNative, ui.answerIsTarget, ui.makingAudio, onMakeAudio)
                             if (!ui.example.isNullOrBlank()) {
                                 Spacer(Modifier.height(24.dp))
                                 SideLabel("EXAMPLE")
@@ -335,26 +336,31 @@ private fun CardText(
     onPlay: (String) -> Unit,
     romanization: String? = null,
     hideNative: Boolean = false,
+    isTarget: Boolean = false,
+    makingAudio: Boolean = false,
+    onMakeAudio: () -> Unit = {},
 ) {
     val c = LocalFlashColors.current
+    val speaker = audio != null || isTarget
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
         Column(Modifier.weight(1f, fill = false), horizontalAlignment = Alignment.CenterHorizontally) {
             if (romanization != null && hideNative) {
-                Text(romanization, style = cardTextStyle(romanization, audio != null), color = color, textAlign = TextAlign.Center)
+                Text(romanization, style = cardTextStyle(romanization, speaker), color = color, textAlign = TextAlign.Center)
             } else {
-                Text(text, style = cardTextStyle(text, audio != null), color = color, textAlign = TextAlign.Center)
+                Text(text, style = cardTextStyle(text, speaker), color = color, textAlign = TextAlign.Center)
                 if (romanization != null) {
                     Spacer(Modifier.height(4.dp))
                     Text(romanization, style = FlashType.bodyMd, color = c.inkSecondary, textAlign = TextAlign.Center)
                 }
             }
         }
-        if (audio != null) {
+        if (speaker) {
             Box(
                 Modifier.padding(start = 10.dp).size(44.dp).clip(CircleShape).background(c.inset)
-                    .semantics { contentDescription = "Listen again" }.clickable { onPlay(audio) },
+                    .semantics { contentDescription = if (audio != null) "Listen again" else "Make audio and listen" }
+                    .clickable(enabled = !makingAudio) { if (audio != null) onPlay(audio) else onMakeAudio() },
                 contentAlignment = Alignment.Center,
-            ) { Text("🔊", style = FlashType.headlineSm) }
+            ) { Text(if (makingAudio) "…" else "🔊", style = FlashType.headlineSm) }
         }
     }
 }
@@ -364,6 +370,10 @@ private fun Dock(ui: ReviewUi, onReveal: () -> Unit, onAnswer: (Verdict) -> Unit
     val c = LocalFlashColors.current
     if (ui.pendingDelete) {
         Text("Tap the bin again to delete this card", style = FlashType.labelMd, color = c.danger, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(6.dp))
+    }
+    if (ui.audioError != null) {
+        Text(ui.audioError, style = FlashType.labelMd, color = c.danger, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(6.dp))
     }
     if (!ui.revealed) {

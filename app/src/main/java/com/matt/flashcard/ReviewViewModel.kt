@@ -31,6 +31,12 @@ data class ReviewUi(
     /** Flag emoji of the Prompt / Answer language, for the car screen. */
     val promptFlag: String = "",
     val answerFlag: String = "",
+    /** Whether that side is the language being learned (it gets the speaker button, with or without audio yet). */
+    val promptIsTarget: Boolean = false,
+    val answerIsTarget: Boolean = false,
+    /** Audio for the Card on screen is being made. */
+    val makingAudio: Boolean = false,
+    val audioError: String? = null,
 )
 
 class ReviewViewModel(app: Application) : AndroidViewModel(app) {
@@ -56,6 +62,36 @@ class ReviewViewModel(app: Application) : AndroidViewModel(app) {
 
     fun play(audioName: String) = player.play(audioName)
 
+    private val elevenLabs = ElevenLabsClient({ AppSettings(app).elevenLabsKey() })
+    private var makingAudio = false
+    private var audioError: String? = null
+
+    /** Makes the audio of the Card on screen the first time its speaker is tapped (one ElevenLabs request), then plays it. */
+    fun makeAudio() {
+        val d = deck ?: return
+        val s = session ?: return
+        val card = s.current ?: return
+        if (makingAudio || card.targetAudioPath != null) return
+        makingAudio = true
+        audioError = null
+        publish()
+        viewModelScope.launch {
+            try {
+                val name = audio.save(elevenLabs.synthesize(card.targetText, d.targetLanguage))
+                val updated = card.copy(targetAudioPath = name)
+                dao.updateCard(updated)
+                s.refreshCurrent(updated)
+                makingAudio = false
+                publish()
+                play(name)
+            } catch (e: AudioException) {
+                audioError = e.message
+                makingAudio = false
+                publish()
+            }
+        }
+    }
+
     override fun onCleared() = player.stop()
 
     fun close() {
@@ -70,6 +106,7 @@ class ReviewViewModel(app: Application) : AndroidViewModel(app) {
     fun delete() = act { persist(delete()) }
 
     private fun act(block: ReviewSession.() -> Unit) {
+        audioError = null
         session?.block()
         publish()
     }
@@ -91,7 +128,7 @@ class ReviewViewModel(app: Application) : AndroidViewModel(app) {
     private fun publish() {
         val s = session ?: return
         val d = deck ?: return
-        _ui.value = buildReviewUi(d, s)
+        _ui.value = buildReviewUi(d, s).copy(makingAudio = makingAudio, audioError = audioError)
     }
 }
 
@@ -120,6 +157,8 @@ internal fun buildReviewUi(d: Deck, s: ReviewSession): ReviewUi {
         hideNative = d.readingMode == ReadingMode.LATIN,
         promptFlag = languageFor(if (srcToTarget) d.sourceLanguage else d.targetLanguage)?.flag.orEmpty(),
         answerFlag = languageFor(if (srcToTarget) d.targetLanguage else d.sourceLanguage)?.flag.orEmpty(),
+        promptIsTarget = !srcToTarget,
+        answerIsTarget = srcToTarget,
     )
 }
 
