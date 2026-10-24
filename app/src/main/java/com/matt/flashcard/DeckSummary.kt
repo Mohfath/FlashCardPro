@@ -6,6 +6,8 @@ data class DeckSummary(
     val due: Int,
     /** Cards per Box, index 0 = Box 1. */
     val boxCounts: List<Int>,
+    /** Cards with no spoken audio yet. */
+    val missingAudio: Int = 0,
 )
 
 fun summarize(decks: List<Deck>, cards: List<Card>, now: Long): List<DeckSummary> {
@@ -17,6 +19,7 @@ fun summarize(decks: List<Deck>, cards: List<Card>, now: Long): List<DeckSummary
             total = own.size,
             due = own.count { Leitner.isDue(it.box, it.lastReviewedAt, now) },
             boxCounts = (Leitner.MIN_BOX..Leitner.MAX_BOX).map { b -> own.count { it.box == b } },
+            missingAudio = cardsWithoutAudio(own).size,
         )
     }
 }

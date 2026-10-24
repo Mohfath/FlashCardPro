@@ -6,6 +6,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -58,39 +68,75 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun DeckListScreen(decks: List<DeckSummary>?, week: List<DayCount>, selectedId: Long, onSelect: (Long) -> Unit, onOpen: (Long) -> Unit, onAddCard: (Long) -> Unit, onLibrary: (Long) -> Unit, onCreate: (String, String, String, ReadingMode, Formality) -> Unit, onDeleteDeck: (Deck) -> Unit,
     backfill: Backfill?, onSetReading: (Deck, ReadingMode, Boolean) -> Unit, onSetFormality: (Deck, Formality) -> Unit, onDismissBackfill: () -> Unit,
+    missingAudio: MissingAudio?, onRedoMissingAudio: (Deck) -> Unit, onDismissMissingAudio: () -> Unit,
+    headerActions: @Composable RowScope.() -> Unit,
 ) {
     val c = LocalFlashColors.current
     var creating by rememberSaveable { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<DeckSummary?>(null) }
     var choosingReading by remember { mutableStateOf<DeckSummary?>(null) }
     var choosingTone by remember { mutableStateOf<DeckSummary?>(null) }
+    var confirmingAudio by remember { mutableStateOf<DeckSummary?>(null) }
 
     Box(Modifier.fillMaxSize().background(c.canvas).safeDrawingPadding()) {
-        Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+        Column(Modifier.fillMaxSize()) {
             Spacer(Modifier.height(8.dp))
-            Text("Flashcards", style = FlashType.headlineLg, color = c.ink)
+            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Flashcards", style = FlashType.headlineLg.copy(fontSize = 28.sp, lineHeight = 36.sp), color = c.ink, maxLines = 1, softWrap = false, modifier = Modifier.weight(1f))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically, content = headerActions)
+            }
             Spacer(Modifier.height(10.dp))
             when {
                 decks == null -> Unit
                 decks.isEmpty() -> EmptyState(Modifier.weight(1f))
                 else -> {
-                    val active = decks.firstOrNull { it.deck.id == selectedId } ?: decks.first()
-                    WeekStrip(week)
-                    Spacer(Modifier.height(12.dp))
-                    DeckPicker(decks, active, onSelect)
-                    Spacer(Modifier.height(16.dp))
-                    Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                        DeckCard(active, onClick = { onOpen(active.deck.id) }, onAddCard = { onAddCard(active.deck.id) }, onLibrary = { onLibrary(active.deck.id) }, onDelete = { deleting = active },
-                            backfill = backfill?.takeIf { it.deckId == active.deck.id }, onDismissBackfill = onDismissBackfill,
-                            onLatin = { choosingReading = active }, onTone = { choosingTone = active },
+                    Box(Modifier.padding(horizontal = 20.dp)) { WeekStrip(week) }
+                    Spacer(Modifier.height(14.dp))
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("YOUR DECKS", style = FlashType.labelMd, color = c.inkSecondary)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "${decks.size} Deck${if (decks.size == 1) "" else "s"}", style = FlashType.labelMd, color = c.accent,
+                            modifier = Modifier.clip(CircleShape).background(c.accent.copy(alpha = 0.12f)).padding(horizontal = 8.dp, vertical = 2.dp),
                         )
+                        Spacer(Modifier.weight(1f))
+                        if (decks.size > 1) Text("Swipe ↔", style = FlashType.labelMd, color = c.inkSecondary, maxLines = 1, softWrap = false)
                     }
+                    Spacer(Modifier.height(10.dp))
+                    DeckCarousel(
+                        decks, selectedId, onSelect,
+                        onOpen = onOpen, onAddCard = onAddCard, onLibrary = onLibrary,
+                        onDelete = { deleting = it }, onLatin = { choosingReading = it }, onTone = { choosingTone = it },
+                        onRedoAudio = { confirmingAudio = it },
+                        backfill = backfill, onDismissBackfill = onDismissBackfill,
+                        missingAudio = missingAudio, onDismissMissingAudio = onDismissMissingAudio,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
             Spacer(Modifier.height(12.dp))
-            DockButton("+  New Deck", c.accent, c.onAccent, Modifier.fillMaxWidth()) { creating = true }
+            DockButton("+  New Deck", c.accent, c.onAccent, Modifier.fillMaxWidth().padding(horizontal = 20.dp)) { creating = true }
             Spacer(Modifier.height(16.dp))
         }
+    }
+
+    confirmingAudio?.let { s ->
+        AlertDialog(
+            modifier = Modifier.padding(horizontal = 28.dp),
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+            onDismissRequest = { confirmingAudio = null },
+            title = { Text("Redo missing audio") },
+            text = {
+                Text(
+                    if (s.missingAudio == 0) "Every card in \"${s.deck.name}\" already has audio."
+                    else "Make audio for the ${s.missingAudio} card${if (s.missingAudio == 1) "" else "s"} in \"${s.deck.name}\" that have none? That uses ${s.missingAudio} ElevenLabs request${if (s.missingAudio == 1) "" else "s"}.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { if (s.missingAudio > 0) onRedoMissingAudio(s.deck); confirmingAudio = null }) { Text(if (s.missingAudio > 0) "Make audio" else "OK") }
+            },
+            dismissButton = { if (s.missingAudio > 0) TextButton(onClick = { confirmingAudio = null }) { Text("Cancel") } },
+        )
     }
 
     choosingTone?.let { s ->
@@ -181,41 +227,6 @@ fun DeckListScreen(decks: List<DeckSummary>?, week: List<DayCount>, selectedId: 
 }
 
 @Composable
-private fun DeckPicker(decks: List<DeckSummary>, active: DeckSummary, onSelect: (Long) -> Unit) {
-    val c = LocalFlashColors.current
-    var open by remember { mutableStateOf(false) }
-    var fieldWidth by remember { mutableStateOf(0.dp) }
-    val density = LocalDensity.current
-    Box {
-        Row(
-            Modifier.fillMaxWidth().onSizeChanged { fieldWidth = with(density) { it.width.toDp() } }.clip(RoundedCornerShape(16.dp)).background(c.surface).border(1.dp, c.divider, RoundedCornerShape(16.dp))
-                .clickable { open = true }.padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(active.deck.name, style = FlashType.headlineSm, color = c.ink, maxLines = 1, modifier = Modifier.weight(1f))
-            if (active.due > 0) Text("${active.due} due", style = FlashType.labelMd, color = c.accent)
-            Icon(Icons.Filled.ArrowDropDown, contentDescription = "Choose deck", tint = c.inkSecondary)
-        }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }, modifier = Modifier.width(fieldWidth), containerColor = c.surface, shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, c.divider)) {
-            decks.forEach { d ->
-                DropdownMenuItem(
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(d.deck.name, style = FlashType.bodyMd, color = c.ink, modifier = Modifier.weight(1f, fill = false))
-                            if (d.due > 0) {
-                                Spacer(Modifier.width(12.dp))
-                                Text("${d.due} due", style = FlashType.labelMd, color = c.accent)
-                            }
-                        }
-                    },
-                    onClick = { onSelect(d.deck.id); open = false },
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun EmptyState(modifier: Modifier) {
     val c = LocalFlashColors.current
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -225,65 +236,86 @@ private fun EmptyState(modifier: Modifier) {
     }
 }
 
+/** The Decks as a row of cards: swipe sideways to switch, the next card peeks in at the edge. */
 @Composable
-private fun DeckCard(
-    s: DeckSummary, onClick: () -> Unit, onAddCard: () -> Unit, onDelete: () -> Unit,
-    backfill: Backfill?, onDismissBackfill: () -> Unit, onLatin: () -> Unit, onTone: () -> Unit, onLibrary: () -> Unit,
+private fun DeckCarousel(
+    decks: List<DeckSummary>, selectedId: Long, onSelect: (Long) -> Unit,
+    onOpen: (Long) -> Unit, onAddCard: (Long) -> Unit, onLibrary: (Long) -> Unit,
+    onDelete: (DeckSummary) -> Unit, onLatin: (DeckSummary) -> Unit, onTone: (DeckSummary) -> Unit, onRedoAudio: (DeckSummary) -> Unit,
+    backfill: Backfill?, onDismissBackfill: () -> Unit, missingAudio: MissingAudio?, onDismissMissingAudio: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val c = LocalFlashColors.current
-    val canReview = s.total > 0
-    val shape = RoundedCornerShape(24.dp)
-    Box {
-    Column(
-        Modifier.fillMaxWidth().clip(shape).background(c.surface).border(1.dp, c.divider, shape)
-            .clickable(enabled = canReview, onClick = onClick).padding(20.dp),
-    ) {
-        Box(Modifier.padding(end = 44.dp)) { Pill("${languageName(s.deck.targetLanguage)} ↔ ${languageName(s.deck.sourceLanguage)}") }
-        Spacer(Modifier.height(12.dp))
-        Text(s.deck.name, style = FlashType.headlineMd, color = c.ink)
-        Text("${s.total} Card${if (s.total == 1) "" else "s"} total", style = FlashType.bodyMd, color = c.inkSecondary)
-        Spacer(Modifier.height(16.dp))
-        BoxBar(s.boxCounts)
-        Spacer(Modifier.height(16.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            when {
-                !canReview -> Text("No Cards yet", style = FlashType.labelLg, color = c.inkSecondary)
-                s.due > 0 -> {
-                    Pill("${s.due} Due", dot = c.accent, tint = true)
-                    Spacer(Modifier.weight(1f))
-                    ReviewLink("Tap to review", c.accent)
-                }
-                else -> {
-                    ExtraPill()
-                    Spacer(Modifier.weight(1f))
-                    ReviewLink("Review", c.extraText)
+    val pager = rememberPagerState(initialPage = pageIndexOf(decks, selectedId)) { decks.size }
+    val latestDecks by rememberUpdatedState(decks)
+    val latestSelected by rememberUpdatedState(selectedId)
+    // Swiping to a card selects that Deck...
+    LaunchedEffect(pager) {
+        snapshotFlow { pager.settledPage }.collect { page ->
+            latestDecks.getOrNull(page)?.let { if (it.deck.id != latestSelected) onSelect(it.deck.id) }
+        }
+    }
+    // ...and a Deck selected some other way (new Deck, deleted Deck) brings its card into view.
+    LaunchedEffect(selectedId, decks.size) {
+        val target = pageIndexOf(decks, selectedId).coerceAtMost(decks.lastIndex)
+        if (target != pager.currentPage) pager.animateScrollToPage(target)
+    }
+    Column(modifier) {
+        HorizontalPager(
+            pager, Modifier.fillMaxWidth(), contentPadding = PaddingValues(start = 20.dp, end = 36.dp), pageSpacing = 12.dp,
+            verticalAlignment = Alignment.Top,
+        ) { page ->
+            val s = decks[page]
+            DeckCard(
+                s,
+                onOpen = { onOpen(s.deck.id) }, onAddCard = { onAddCard(s.deck.id) }, onLibrary = { onLibrary(s.deck.id) },
+                onDelete = { onDelete(s) }, onLatin = { onLatin(s) }, onTone = { onTone(s) }, onRedoAudio = { onRedoAudio(s) },
+                backfill = backfill?.takeIf { it.deckId == s.deck.id }, onDismissBackfill = onDismissBackfill,
+                missingAudio = missingAudio?.takeIf { it.deckId == s.deck.id }, onDismissMissingAudio = onDismissMissingAudio,
+            )
+        }
+        if (decks.size > 1) {
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                decks.forEachIndexed { i, _ ->
+                    val active = i == pager.currentPage
+                    Box(
+                        Modifier.padding(horizontal = 3.dp).height(8.dp).width(if (active) 24.dp else 8.dp).clip(CircleShape)
+                            .background(if (active) c.accent else c.accent.copy(alpha = 0.25f)),
+                    )
                 }
             }
         }
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "+  Add Card", style = FlashType.labelLg, color = c.accent,
-            modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onAddCard).padding(vertical = 10.dp, horizontal = 4.dp),
-        )
-        Text(
-            "📚  Library", style = FlashType.labelLg, color = c.accent,
-            modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onLibrary).padding(vertical = 10.dp, horizontal = 4.dp),
-        )
-        if (languageFor(s.deck.targetLanguage)?.latin == false) {
-            Text(
-                "Show: ${s.deck.readingMode.label} · change",
-                style = FlashType.labelLg, color = c.inkSecondary,
-                modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onLatin).padding(vertical = 10.dp, horizontal = 4.dp),
-            )
+    }
+}
+
+@Composable
+private fun DeckCard(
+    s: DeckSummary, onOpen: () -> Unit, onAddCard: () -> Unit, onLibrary: () -> Unit, onDelete: () -> Unit,
+    onLatin: () -> Unit, onTone: () -> Unit, onRedoAudio: () -> Unit,
+    backfill: Backfill?, onDismissBackfill: () -> Unit, missingAudio: MissingAudio?, onDismissMissingAudio: () -> Unit,
+) {
+    val c = LocalFlashColors.current
+    val shape = RoundedCornerShape(32.dp)
+    Column(
+        Modifier.fillMaxWidth()
+            .shadow(10.dp, shape, ambientColor = c.accent.copy(alpha = 0.18f), spotColor = c.accent.copy(alpha = 0.18f))
+            .clip(shape).background(c.surface).border(1.dp, c.divider, shape).padding(20.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            LanguageBadge(s.deck)
+            Spacer(Modifier.weight(1f))
+            DeckMenu(s, onAddCard, onLibrary, onLatin, onTone, onRedoAudio, onDelete)
         }
-        if (supportsFormality(s.deck.targetLanguage)) {
-            Text(
-                "Tone: ${s.deck.formality.label} · change",
-                style = FlashType.labelLg, color = c.inkSecondary,
-                modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onTone).padding(vertical = 10.dp, horizontal = 4.dp),
-            )
-        }
+        Spacer(Modifier.height(16.dp))
+        Text(s.deck.name, style = FlashType.headlineMd.copy(fontSize = 26.sp, lineHeight = 32.sp), color = c.ink, maxLines = 2)
+        Text("${s.total} Card${if (s.total == 1) "" else "s"} total", style = FlashType.bodyMd, color = c.inkSecondary)
+        Spacer(Modifier.height(18.dp))
+        BoxBar(s.boxCounts)
+        Spacer(Modifier.height(20.dp))
+        ReviewButton(reviewAction(s.total, s.due), onOpen)
         if (backfill != null) {
+            Spacer(Modifier.height(10.dp))
             Text(
                 when {
                     backfill.error != null -> "Stopped at ${backfill.done} of ${backfill.total}: ${backfill.error}"
@@ -291,45 +323,105 @@ private fun DeckCard(
                     else -> "Writing Latin letters… ${backfill.done} of ${backfill.total}"
                 },
                 style = FlashType.labelMd, color = if (backfill.error != null) c.danger else c.accent,
-                modifier = Modifier.clickable(enabled = backfill.finished, onClick = onDismissBackfill).padding(horizontal = 4.dp),
+                modifier = Modifier.clickable(enabled = backfill.finished, onClick = onDismissBackfill),
+            )
+        }
+        if (missingAudio != null) {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                when {
+                    missingAudio.error != null -> "Stopped at ${missingAudio.done} of ${missingAudio.total}: ${missingAudio.error}"
+                    missingAudio.finished -> "Audio made for ${missingAudio.done} card${if (missingAudio.done == 1) "" else "s"}."
+                    else -> "Making audio… ${missingAudio.done} of ${missingAudio.total}"
+                },
+                style = FlashType.labelMd, color = if (missingAudio.error != null) c.danger else c.accent,
+                modifier = Modifier.clickable(enabled = missingAudio.finished, onClick = onDismissMissingAudio),
             )
         }
     }
-    TrashIcon(
-        c.inkSecondary,
-        Modifier.align(Alignment.TopEnd).padding(14.dp).size(34.dp).clip(CircleShape).background(c.inset)
-            .clickable(onClick = onDelete).padding(8.dp),
-    )
-    }
 }
 
-/** A thin outlined bin, drawn so it matches the app's light line icons. */
+/** "🇭🇷 HR → 🇬🇧 EN": the language being learned, then the learner's own. */
 @Composable
-private fun TrashIcon(color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier.semantics { contentDescription = "Delete deck" }) {
-        val w = size.width
-        val h = size.height
-        val stroke = Stroke(width = w * 0.09f, cap = StrokeCap.Round, join = StrokeJoin.Round)
-        drawPath(Path().apply { moveTo(w * 0.12f, h * 0.24f); lineTo(w * 0.88f, h * 0.24f) }, color, style = stroke)
-        drawPath(
-            Path().apply { moveTo(w * 0.36f, h * 0.24f); lineTo(w * 0.36f, h * 0.12f); lineTo(w * 0.64f, h * 0.12f); lineTo(w * 0.64f, h * 0.24f) },
-            color, style = stroke,
-        )
-        drawPath(
-            Path().apply { moveTo(w * 0.22f, h * 0.24f); lineTo(w * 0.29f, h * 0.88f); lineTo(w * 0.71f, h * 0.88f); lineTo(w * 0.78f, h * 0.24f) },
-            color, style = stroke,
-        )
-        drawPath(Path().apply { moveTo(w * 0.42f, h * 0.42f); lineTo(w * 0.42f, h * 0.70f) }, color, style = stroke)
-        drawPath(Path().apply { moveTo(w * 0.58f, h * 0.42f); lineTo(w * 0.58f, h * 0.70f) }, color, style = stroke)
+private fun LanguageBadge(deck: Deck) {
+    val c = LocalFlashColors.current
+    fun part(code: String) = "${languageFor(code)?.flag.orEmpty()} ${code.uppercase()}".trim()
+    Row(
+        Modifier.clip(CircleShape).background(c.accent.copy(alpha = 0.1f)).border(1.dp, c.accent.copy(alpha = 0.25f), CircleShape)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("${part(deck.targetLanguage)}  →  ${part(deck.sourceLanguage)}", style = FlashType.labelLg, color = c.accent, maxLines = 1)
     }
 }
 
 @Composable
-private fun ReviewLink(label: String, color: Color) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = FlashType.labelLg, color = color)
-        Spacer(Modifier.width(6.dp))
-        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
+private fun ReviewButton(action: ReviewAction, onClick: () -> Unit) {
+    val c = LocalFlashColors.current
+    val shape = RoundedCornerShape(16.dp)
+    val bg = when {
+        !action.enabled -> c.inset
+        action.extraPractice -> c.extraBg
+        else -> c.accent
+    }
+    val fg = when {
+        !action.enabled -> c.inkSecondary
+        action.extraPractice -> c.extraText
+        else -> c.onAccent
+    }
+    Box(
+        Modifier.fillMaxWidth().height(56.dp).clip(shape).background(bg)
+            .border(if (action.extraPractice) 1.dp else 0.dp, if (action.extraPractice) c.extraBorder else Color.Transparent, shape)
+            .clickable(enabled = action.enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(action.label, style = FlashType.headlineSm, color = fg)
+            if (action.enabled) {
+                Spacer(Modifier.width(8.dp))
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = fg, modifier = Modifier.size(18.dp))
+            }
+        }
+    }
+}
+
+/** The three-dot menu of a Deck card. */
+@Composable
+private fun DeckMenu(
+    s: DeckSummary, onAddCard: () -> Unit, onLibrary: () -> Unit, onLatin: () -> Unit, onTone: () -> Unit, onRedoAudio: () -> Unit, onDelete: () -> Unit,
+) {
+    val c = LocalFlashColors.current
+    var open by remember { mutableStateOf(false) }
+    @Composable
+    fun item(chip: String, label: String, color: Color = c.ink, chipBg: Color = c.accent.copy(alpha = 0.1f), onClick: () -> Unit) {
+        DropdownMenuItem(
+            text = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(28.dp).clip(RoundedCornerShape(9.dp)).background(chipBg), contentAlignment = Alignment.Center) {
+                        Text(chip, fontSize = 14.sp, color = color, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Text(label, style = FlashType.labelLg, color = color)
+                }
+            },
+            onClick = { open = false; onClick() },
+        )
+    }
+    Box {
+        Box(
+            Modifier.size(38.dp).clip(CircleShape).background(c.surface).border(1.dp, c.divider, CircleShape)
+                .semantics { contentDescription = "Deck options" }.clickable { open = true },
+            contentAlignment = Alignment.Center,
+        ) { Text("⋮", style = FlashType.headlineSm, color = c.inkSecondary) }
+        DropdownMenu(open, { open = false }, containerColor = c.surface, shape = RoundedCornerShape(18.dp), border = BorderStroke(1.dp, c.divider)) {
+            item("+", "Add Card", onClick = onAddCard)
+            item("📚", "Deck Library", onClick = onLibrary)
+            if (languageFor(s.deck.targetLanguage)?.latin == false) item("Aa", "Show cards in…", onClick = onLatin)
+            if (supportsFormality(s.deck.targetLanguage)) item("💬", "Tone…", onClick = onTone)
+            item("🔊", "Redo Missing Audio", onClick = onRedoAudio)
+            HorizontalDivider(color = c.divider)
+            item("🗑", "Delete Deck", color = c.danger, chipBg = c.danger.copy(alpha = 0.1f), onClick = onDelete)
+        }
     }
 }
 
@@ -337,7 +429,7 @@ private fun ReviewLink(label: String, color: Color) {
 private fun BoxBar(counts: List<Int>) {
     val c = LocalFlashColors.current
     val total = counts.sum()
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.inset).padding(12.dp)) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.inset).padding(horizontal = 10.dp, vertical = 12.dp)) {
         val counted = "Box 1: ${counts.first()} · Box 5: ${counts.last()}"
         if (LocalDensity.current.fontScale > 1.3f) {
             // Big system fonts: stack the two lines instead of letting them squeeze each other.
@@ -345,8 +437,9 @@ private fun BoxBar(counts: List<Int>) {
             Text(counted, style = FlashType.labelMd, color = c.inkSecondary)
         } else {
             Row {
-                Text("Boxes 1–5", style = FlashType.labelMd, color = c.inkSecondary, modifier = Modifier.weight(1f))
-                Text(counted, style = FlashType.labelMd, color = c.inkSecondary, maxLines = 1, softWrap = false)
+                Text("Boxes 1–5", style = FlashType.labelMd, color = c.inkSecondary, maxLines = 1, softWrap = false)
+                Spacer(Modifier.width(8.dp))
+                Text(counted, style = FlashType.labelMd.copy(fontSize = 11.sp), color = c.inkSecondary, textAlign = TextAlign.End, maxLines = 1, softWrap = false, modifier = Modifier.weight(1f))
             }
         }
         Spacer(Modifier.height(8.dp))

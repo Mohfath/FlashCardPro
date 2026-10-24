@@ -43,13 +43,15 @@ class MainActivity : ComponentActivity() {
                 var settingsOpen by rememberSaveable { mutableStateOf(false) }
                 var importDeckId by rememberSaveable { mutableStateOf<Long?>(null) }
                 var libraryDeckId by rememberSaveable { mutableStateOf<Long?>(null) }
+                var helpOpen by rememberSaveable { mutableStateOf(false) }
 
                 LaunchedEffect(reviewDeckId) { reviewDeckId?.let(review::open) ?: review.close() }
                 LaunchedEffect(addCardDeckId) { addCardDeckId?.let(addCard::open) ?: addCard.close() }
                 LaunchedEffect(importDeckId) { importDeckId?.let(importer::open) ?: importer.close() }
                 LaunchedEffect(libraryDeckId) { libraryDeckId?.let(library::open) ?: library.close() }
-                BackHandler(enabled = reviewDeckId != null || addCardDeckId != null || libraryDeckId != null || settingsOpen) {
+                BackHandler(enabled = reviewDeckId != null || addCardDeckId != null || libraryDeckId != null || settingsOpen || helpOpen) {
                     if (settingsOpen) { settingsOpen = false; return@BackHandler }
+                    if (helpOpen) { helpOpen = false; return@BackHandler }
                     if (libraryDeckId != null) { libraryDeckId = null; return@BackHandler }
                     // From the import page, back goes to Add Card; from there, back to the deck list.
                     if (importDeckId != null) importDeckId = null
@@ -62,6 +64,7 @@ class MainActivity : ComponentActivity() {
                 Box(Modifier.fillMaxSize()) {
                 when {
                     settingsOpen -> SettingsScreen(settings, onBack = { settingsOpen = false })
+                    helpOpen -> HelpScreen(onBack = { helpOpen = false })
                     reviewDeckId != null -> ReviewScreen(
                         ui = review.ui.collectAsState().value,
                         onBack = { reviewDeckId = null },
@@ -110,16 +113,24 @@ class MainActivity : ComponentActivity() {
                         onSetReading = deckList::setReadingMode,
                         onSetFormality = deckList::setFormality,
                         onDismissBackfill = deckList::dismissBackfill,
+                        missingAudio = deckList.missingAudio.collectAsState().value,
+                        onRedoMissingAudio = deckList::redoMissingAudio,
+                        onDismissMissingAudio = deckList::dismissMissingAudio,
+                        headerActions = {
+                            ThemePicker(theme, { theme = it; prefs.edit().putString("theme", it.name).apply() })
+                            CornerButton("⚙️", "Settings") { settingsOpen = true }
+                            CornerButton("?", "Help") { helpOpen = true }
+                        },
                     )
                 }
-                Row(
-                    Modifier.align(Alignment.TopEnd).safeDrawingPadding().padding(top = 4.dp, end = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    if (!settingsOpen && reviewDeckId == null && addCardDeckId == null && importDeckId == null && libraryDeckId == null) {
-                        CornerButton("⚙️", "Settings") { settingsOpen = true }
+                val onDeckList = !settingsOpen && !helpOpen && reviewDeckId == null && addCardDeckId == null && importDeckId == null && libraryDeckId == null
+                if (!onDeckList) {
+                    Row(
+                        Modifier.align(Alignment.TopEnd).safeDrawingPadding().padding(top = 4.dp, end = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        ThemePicker(theme, { theme = it; prefs.edit().putString("theme", it.name).apply() })
                     }
-                    ThemePicker(theme, { theme = it; prefs.edit().putString("theme", it.name).apply() })
                 }
                 }
             }

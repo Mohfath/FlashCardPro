@@ -21,6 +21,36 @@ class DeckListViewModel(app: Application) : AndroidViewModel(app) {
 
     val backfill = MutableStateFlow<Backfill?>(null)
 
+    private val audio = AudioStore(app)
+    private val elevenLabs = ElevenLabsClient({ AppSettings(app).elevenLabsKey() })
+    val missingAudio = MutableStateFlow<MissingAudio?>(null)
+
+    /** Makes audio for every Card of the Deck that has none, one by one; stops at the first problem. */
+    fun redoMissingAudio(deck: Deck) {
+        viewModelScope.launch {
+            val todo = cardsWithoutAudio(dao.cardsIn(deck.id))
+            if (todo.isEmpty()) return@launch
+            var done = 0
+            missingAudio.value = MissingAudio(deck.id, 0, todo.size)
+            for (card in todo) {
+                try {
+                    val name = audio.save(elevenLabs.synthesize(card.targetText, deck.targetLanguage))
+                    dao.updateCard(card.copy(targetAudioPath = name))
+                    done++
+                    missingAudio.value = MissingAudio(deck.id, done, todo.size)
+                } catch (e: AudioException) {
+                    missingAudio.value = MissingAudio(deck.id, done, todo.size, finished = true, error = e.message)
+                    return@launch
+                }
+            }
+            missingAudio.value = MissingAudio(deck.id, done, todo.size, finished = true)
+        }
+    }
+
+    fun dismissMissingAudio() {
+        missingAudio.value = null
+    }
+
     /** Sets how a Deck shows its target language; a mode with Latin letters can also fill in the Cards that are already there. */
     fun setReadingMode(deck: Deck, mode: ReadingMode, fillExisting: Boolean) {
         viewModelScope.launch {
