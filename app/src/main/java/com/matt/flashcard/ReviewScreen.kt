@@ -74,7 +74,7 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.abs
 
 @Composable
-fun ReviewScreen(ui: ReviewUi?, onBack: () -> Unit, onPlay: (String) -> Unit, onMakeAudio: () -> Unit, onReveal: () -> Unit, onAnswer: (Verdict) -> Unit, onDelete: () -> Unit) {
+fun ReviewScreen(ui: ReviewUi?, onBack: () -> Unit, onPlay: (String) -> Unit, onMakeAudio: () -> Unit, onReveal: () -> Unit, onAnswer: (Verdict) -> Unit, onDelete: () -> Unit, onEdit: (String, String, String?) -> Unit) {
     val c = LocalFlashColors.current
     Box(Modifier.fillMaxSize().background(c.canvas).safeDrawingPadding()) {
         when {
@@ -82,6 +82,7 @@ fun ReviewScreen(ui: ReviewUi?, onBack: () -> Unit, onPlay: (String) -> Unit, on
             ui.cardId == null -> FinishedState(ui.deckName, onBack)
             else -> {
                 val scroll = rememberScrollState()
+                var editing by remember { mutableStateOf(false) }
                 val swipe = remember { CardSwipe() }
                 val scope = rememberCoroutineScope()
                 val answerAnimated: (Verdict) -> Unit = { v ->
@@ -113,8 +114,9 @@ fun ReviewScreen(ui: ReviewUi?, onBack: () -> Unit, onPlay: (String) -> Unit, on
                         },
                     )
                     Spacer(Modifier.height(16.dp))
-                    Dock(ui, onReveal, answerAnimated, onDelete)
+                    Dock(ui, onReveal, answerAnimated, onDelete) { editing = true }
                     Spacer(Modifier.height(16.dp))
+                    if (editing) EditCardDialog(ui, { editing = false }) { source, target, reading -> onEdit(source, target, reading); editing = false }
                 }
             }
         }
@@ -366,7 +368,7 @@ private fun CardText(
 }
 
 @Composable
-private fun Dock(ui: ReviewUi, onReveal: () -> Unit, onAnswer: (Verdict) -> Unit, onDelete: () -> Unit) {
+private fun Dock(ui: ReviewUi, onReveal: () -> Unit, onAnswer: (Verdict) -> Unit, onDelete: () -> Unit, onEdit: () -> Unit) {
     val c = LocalFlashColors.current
     if (ui.pendingDelete) {
         Text("Tap the bin again to delete this card", style = FlashType.labelMd, color = c.danger, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
@@ -376,29 +378,64 @@ private fun Dock(ui: ReviewUi, onReveal: () -> Unit, onAnswer: (Verdict) -> Unit
         Text(ui.audioError, style = FlashType.labelMd, color = c.danger, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(6.dp))
     }
+    val deleteBg = if (ui.pendingDelete) c.danger.copy(alpha = 0.18f) else c.surface
     if (!ui.revealed) {
         DockButton("Reveal", c.accent, c.onAccent, Modifier.fillMaxWidth(), onReveal)
         Spacer(Modifier.height(10.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-            IconAction("🗑️", "Delete card", 48, if (ui.pendingDelete) c.danger.copy(alpha = 0.18f) else c.inset, onDelete)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally)) {
+            IconAction("\u270F\uFE0F", "Edit card", 48, c.surface, onEdit)
+            IconAction("\uD83D\uDDD1\uFE0F", "Delete card", 48, deleteBg, onDelete)
         }
     } else {
-        // Left: didn't know. Centre: delete. Right: know. Swiping the card left or right does the same as the outer two.
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            IconAction("🤷", "Didn't know", 68, c.inset) { onAnswer(Verdict.DIDNT_KNOW) }
-            IconAction("🗑️", "Delete card", 52, if (ui.pendingDelete) c.danger.copy(alpha = 0.18f) else c.inset, onDelete)
-            IconAction("👍", "Know", 68, c.accent) { onAnswer(Verdict.KNOW) }
+        // Didn't know and Know are the big ones at the ends; Edit and Delete sit between them. Swiping the card does the same as the outer two.
+        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            IconAction("\uD83E\uDD37", "Didn't know", 68, c.surface) { onAnswer(Verdict.DIDNT_KNOW) }
+            IconAction("\u270F\uFE0F", "Edit card", 52, c.surface, onEdit)
+            IconAction("\uD83D\uDDD1\uFE0F", "Delete card", 52, deleteBg, onDelete)
+            IconAction("\uD83D\uDC4D", "Know", 68, c.accent) { onAnswer(Verdict.KNOW) }
         }
     }
 }
 
-/** A round button with one emoji on it. */
+/** A round button with one emoji on it; every one has a fill and a thin outline so they read as buttons on any background. */
 @Composable
 private fun IconAction(emoji: String, description: String, sizeDp: Int, bg: androidx.compose.ui.graphics.Color, onClick: () -> Unit) {
+    val c = LocalFlashColors.current
     Box(
-        Modifier.size(sizeDp.dp).clip(CircleShape).background(bg).semantics { contentDescription = description }.clickable(onClick = onClick),
+        Modifier.size(sizeDp.dp).clip(CircleShape).background(bg).border(1.5.dp, c.divider, CircleShape)
+            .semantics { contentDescription = description }.clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { Text(emoji, fontSize = (sizeDp * 0.45f).sp) }
+}
+
+@Composable
+private fun EditCardDialog(ui: ReviewUi, onDismiss: () -> Unit, onSave: (String, String, String?) -> Unit) {
+    var source by remember(ui.cardId) { mutableStateOf(ui.sourceText) }
+    var target by remember(ui.cardId) { mutableStateOf(ui.targetText) }
+    var reading by remember(ui.cardId) { mutableStateOf(ui.targetReading) }
+    androidx.compose.material3.AlertDialog(
+        modifier = Modifier.padding(horizontal = 28.dp),
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+        onDismissRequest = onDismiss,
+        title = { Text("Edit card") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // A Deck shown in Latin letters is edited in Latin letters; the script is rebuilt from them.
+                if (ui.hideNative) {
+                    androidx.compose.material3.OutlinedTextField(reading, { reading = it }, label = { Text("${ui.targetLabel} (Latin letters)") })
+                } else {
+                    androidx.compose.material3.OutlinedTextField(target, { target = it }, label = { Text(ui.targetLabel) })
+                }
+                androidx.compose.material3.OutlinedTextField(source, { source = it }, label = { Text(ui.sourceLabel) })
+                val targetEdited = if (ui.hideNative) reading.trim() != ui.targetReading else target.trim() != ui.targetText
+                if (targetEdited) Text("Changing the ${ui.targetLabel} text clears its audio; it is made again when you play it.", style = FlashType.labelMd)
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = { onSave(source, target, if (ui.hideNative) reading else null) }, enabled = source.isNotBlank() && target.isNotBlank() && (!ui.hideNative || reading.isNotBlank())) { Text("Save") }
+        },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable

@@ -37,6 +37,12 @@ data class ReviewUi(
     /** Audio for the Card on screen is being made. */
     val makingAudio: Boolean = false,
     val audioError: String? = null,
+    /** The Card on screen as stored, for the Edit dialog. */
+    val sourceText: String = "",
+    val targetText: String = "",
+    val sourceLabel: String = "",
+    val targetLabel: String = "",
+    val targetReading: String = "",
 )
 
 class ReviewViewModel(app: Application) : AndroidViewModel(app) {
@@ -105,6 +111,63 @@ class ReviewViewModel(app: Application) : AndroidViewModel(app) {
     fun answer(verdict: Verdict) = act { persist(answer(verdict)) }
     fun delete() = act { persist(delete()) }
 
+    /**
+     * Saves new texts for the Card on screen. A changed target text no longer matches its audio or reading, so those are dropped and the
+     * reading is made again. For a Deck shown in Latin letters the learner edits the [reading] instead: the script is then rebuilt from it.
+     */
+    fun edit(source: String, target: String, reading: String? = null) {
+        val d = deck ?: return
+        val s = session ?: return
+        val card = s.current ?: return
+        val newSource = source.trim()
+        if (newSource.isEmpty() || target.isBlank()) return
+        val newReading = reading?.trim()
+        if (newReading != null && newReading.isNotEmpty() && newReading != card.romanization.orEmpty()) {
+            viewModelScope.launch {
+                try {
+                    val script = Romanizer(AppSettings(getApplication())).toScript(newReading, languageFor(d.targetLanguage)?.name ?: d.targetLanguage)
+                    save(card, d, s, newSource, script.trim(), newReading)
+                } catch (e: RomanizationException) {
+                    audioError = e.message
+                    publish()
+                }
+            }
+        } else {
+            save(card, d, s, newSource, target.trim(), null)
+        }
+    }
+
+    /** [reading] is the Latin reading to keep when it was just written by the learner; null means keep or remake the old one. */
+    private fun save(card: Card, d: Deck, s: ReviewSession, newSource: String, newTarget: String, reading: String?) {
+        val targetChanged = newTarget != card.targetText
+        if (targetChanged) audio.delete(card.targetAudioPath)
+        val updated = card.copy(
+            sourceText = newSource, targetText = newTarget,
+            targetAudioPath = if (targetChanged) null else card.targetAudioPath,
+            romanization = reading ?: if (targetChanged) null else card.romanization,
+        )
+        s.refreshCurrent(updated)
+        audioError = null
+        publish()
+        viewModelScope.launch {
+            dao.updateCard(updated)
+            if (targetChanged && reading == null && d.romanize) {
+                try {
+                    val remade = Romanizer(AppSettings(getApplication())).romanize(newTarget, languageFor(d.targetLanguage)?.name ?: d.targetLanguage)
+                    val withReading = updated.copy(romanization = remade)
+                    dao.updateCard(withReading)
+                    if (s.current?.id == withReading.id) {
+                        s.refreshCurrent(withReading)
+                        publish()
+                    }
+                } catch (e: RomanizationException) {
+                    audioError = e.message
+                    publish()
+                }
+            }
+        }
+    }
+
     private fun act(block: ReviewSession.() -> Unit) {
         audioError = null
         session?.block()
@@ -159,6 +222,11 @@ internal fun buildReviewUi(d: Deck, s: ReviewSession): ReviewUi {
         answerFlag = languageFor(if (srcToTarget) d.targetLanguage else d.sourceLanguage)?.flag.orEmpty(),
         promptIsTarget = !srcToTarget,
         answerIsTarget = srcToTarget,
+        sourceText = card.sourceText,
+        targetText = card.targetText,
+        sourceLabel = languageLabel(d.sourceLanguage),
+        targetLabel = languageLabel(d.targetLanguage),
+        targetReading = card.romanization.orEmpty(),
     )
 }
 

@@ -73,6 +73,7 @@ class MainActivity : ComponentActivity() {
                         onReveal = review::reveal,
                         onAnswer = review::answer,
                         onDelete = review::delete,
+                        onEdit = review::edit,
                     )
                     libraryDeckId != null -> LibraryScreen(
                         ui = library.ui.collectAsState().value,
